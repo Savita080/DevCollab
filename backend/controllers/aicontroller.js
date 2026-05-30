@@ -8,6 +8,23 @@ import { logProjectActivity } from '../utils/activityLogger.js';
 import { PROJ_ACTIONS, OBJECT_TYPES } from '../utils/activityActions.js';
 import { refundAIQuota } from '../middleware/planLimits.js';
 
+// Tasks now support multiple assignees (`assignees[]`), with a legacy single
+// `assignee` kept for back-compat. These helpers flatten both into the shape the
+// Python AI services expect (a comma-joined name string / first id).
+function assigneeList(t) {
+    if (Array.isArray(t.assignees) && t.assignees.length) return t.assignees;
+    if (t.assignee) return [t.assignee];
+    return [];
+}
+function assigneeNames(t) {
+    const list = assigneeList(t).map(a => a?.name).filter(Boolean);
+    return list.length ? list.join(', ') : null;
+}
+function firstAssigneeId(t) {
+    const list = assigneeList(t);
+    return list.length ? (list[0]?._id?.toString() || list[0]?.toString() || null) : null;
+}
+
 async function logAiServiceUse(userId, projectId, action, label) {
     try {
         const project = await Project.findById(projectId).select('workspace name');
@@ -96,6 +113,7 @@ export const generateStandup = async (req, res) => {
         const userProjectRole = projMember?.role || 'VIEWER';
 
         const tasks = await Task.find({ project: projectId, updatedAt: { $gte: since } })
+            .populate('assignees', 'name')
             .populate('assignee', 'name')
             .lean();
 
@@ -104,7 +122,7 @@ export const generateStandup = async (req, res) => {
             title: t.title,
             status: t.status,
             priority: t.priority,
-            assignee_name: t.assignee?.name || null,
+            assignee_name: assigneeNames(t),
             updated_at: t.updatedAt,
         }));
 
@@ -240,6 +258,7 @@ export const summarizeProject = async (req, res) => {
         if (!project) return res.status(404).json({ message: "Project not found" });
 
         const tasks = await Task.find({ project: projectId })
+            .populate('assignees', 'name')
             .populate('assignee', 'name')
             .lean();
 
@@ -255,8 +274,8 @@ export const summarizeProject = async (req, res) => {
                 due_date: t.dueDate || null,
                 created_at: t.createdAt,
                 updated_at: t.updatedAt,
-                assignee_id: t.assignee?._id?.toString() || null,
-                assignee_name: t.assignee?.name || null,
+                assignee_id: firstAssigneeId(t),
+                assignee_name: assigneeNames(t),
             })),
             members: project.members.map(m => ({
                 user_id: m.user._id.toString(),
@@ -340,6 +359,7 @@ export const findBottlenecks = async (req, res) => {
         if (!project) return res.status(404).json({ message: "Project not found" });
 
         const tasks = await Task.find({ project: projectId })
+            .populate('assignees', 'name')
             .populate('assignee', 'name')
             .lean();
 
@@ -366,8 +386,8 @@ export const findBottlenecks = async (req, res) => {
             description: t.description || '',
             status: t.status,
             priority: t.priority,
-            assignee_id: t.assignee?._id?.toString() || null,
-            assignee_name: t.assignee?.name || null,
+            assignee_id: firstAssigneeId(t),
+            assignee_name: assigneeNames(t),
             due_date: t.dueDate || null,
             labels: t.labels || [],
             created_at: t.createdAt,

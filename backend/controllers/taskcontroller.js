@@ -4,14 +4,26 @@ import { notifyUser } from '../utils/notify.js';
 import { logProjectActivity } from '../utils/activityLogger.js';
 import { PROJ_ACTIONS, OBJECT_TYPES } from '../utils/activityActions.js';
 
+// Normalize an incoming assignee payload into a clean array of id strings.
+// Accepts `assignees` (array — preferred) OR legacy `assignee` (single). Dedupes
+// and drops falsy values.
+function normalizeAssignees(body) {
+    const raw = Array.isArray(body.assignees)
+        ? body.assignees
+        : (body.assignee !== undefined ? [body.assignee] : []);
+    return [...new Set(raw.map(a => (a && a._id) ? a._id.toString() : (a ? a.toString() : null)).filter(Boolean))];
+}
+
 export const createTask = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const { title, description, status, priority, assignee, dueDate } = req.body;
+        const { title, description, status, priority, dueDate } = req.body;
 
         if (!title) {
             return res.status(400).json({ message: "Task title is required" });
         }
+
+        const assignees = normalizeAssignees(req.body);
 
         const lastTask = await Task.findOne({ project: projectId, status: status || 'TODO' })
             .sort('-position')
@@ -25,25 +37,34 @@ export const createTask = async (req, res) => {
             description,
             status: status || 'TODO',
             priority: priority || 'P2',
-            assignee: assignee || null,
+            assignees,
+            assignee: assignees[0] || null, // mirror first for back-compat
+            createdBy: req.userId,
             dueDate: dueDate || null,
             position
         });
 
-        // Notify the assignee if one was set
-        if (assignee) {
+        // Notify every assignee (except the creator)
+        if (assignees.length) {
             const sender = await User.findById(req.userId).select('name');
             const senderName = sender?.name || 'Someone';
-            notifyUser(req.io, {
-                recipient: assignee,
-                sender: req.userId,
-                type: 'PROJECT_ASSIGN',
-                content: `${senderName} assigned you to "${title}"`,
-                link: `/workspaces/${req.params.workspaceId}/projects/${projectId}/kanban`,
-            }).catch(err => console.error('[task-assign notify] failed:', err.message));
+            for (const uid of assignees) {
+                notifyUser(req.io, {
+                    recipient: uid,
+                    sender: req.userId,
+                    type: 'PROJECT_ASSIGN',
+                    content: `${senderName} assigned you to "${title}"`,
+                    link: `/workspaces/${req.params.workspaceId}/projects/${projectId}/kanban`,
+                }).catch(err => console.error('[task-assign notify] failed:', err.message));
+            }
         }
 
-        req.io.to(projectId).emit('task_created', newTask);
+        // Return the task with creator + assignees populated for immediate UI use.
+        const populated = await Task.findById(newTask._id)
+            .populate('assignees', 'name avatar')
+            .populate('createdBy', 'name avatar');
+
+        req.io.to(projectId).emit('task_created', populated);
 
         await logProjectActivity({
             workspace: req.params.workspaceId,
@@ -57,7 +78,7 @@ export const createTask = async (req, res) => {
 
         res.status(201).json({
             message: "Task created successfully",
-            task: newTask
+            task: populated
         });
     } catch (error) {
         console.error("Error creating task:", error.message);
@@ -68,7 +89,10 @@ export const createTask = async (req, res) => {
 export const getProjectTasks = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const tasks = await Task.find({ project: projectId }).sort('position');
+        const tasks = await Task.find({ project: projectId })
+            .populate('assignees', 'name avatar')
+            .populate('createdBy', 'name avatar')
+            .sort('position');
         res.status(200).json({ tasks });
     } catch (error) {
         console.error("Error fetching tasks:", error.message);
@@ -77,8 +101,9 @@ export const getProjectTasks = async (req, res) => {
 };
 
 // Fields a client is allowed to change on a task. Prevents mass-assignment of
-// `project`, `position`, timestamps, etc. via a crafted request body.
-const TASK_UPDATABLE = ['title', 'description', 'status', 'priority', 'assignee', 'dueDate', 'labels'];
+// `project`, `position`, `createdBy`, timestamps, etc. via a crafted request body.
+// `assignees` is handled separately below (not via this allowlist).
+const TASK_UPDATABLE = ['title', 'description', 'status', 'priority', 'dueDate', 'labels'];
 
 export const updateTask = async (req, res) => {
     try {
@@ -86,7 +111,7 @@ export const updateTask = async (req, res) => {
 
         // Scope to the project in the URL so a contributor on project A can't
         // edit a task that lives in project B by guessing its id (IDOR).
-        const before = await Task.findOne({ _id: taskId, project: projectId }).select('assignee title');
+        const before = await Task.findOne({ _id: taskId, project: projectId }).select('assignees assignee title');
         if (!before) {
             return res.status(404).json({ message: "Task not found" });
         }
@@ -96,25 +121,38 @@ export const updateTask = async (req, res) => {
             if (req.body[key] !== undefined) updates[key] = req.body[key];
         }
 
+        // Assignees: accept `assignees[]` or legacy `assignee`. Only touch them
+        // if the client actually sent one of those keys.
+        let newAssignees = null;
+        if (req.body.assignees !== undefined || req.body.assignee !== undefined) {
+            newAssignees = normalizeAssignees(req.body);
+            updates.assignees = newAssignees;
+            updates.assignee = newAssignees[0] || null; // mirror first for back-compat
+        }
+
         const updatedTask = await Task.findByIdAndUpdate(
             taskId,
             { $set: updates },
             { new: true }
-        );
+        ).populate('assignees', 'name avatar').populate('createdBy', 'name avatar');
 
-        // Notify new assignee if it changed and is non-null
-        const prevAssignee = before.assignee?.toString() || null;
-        const newAssignee = updatedTask.assignee?.toString() || null;
-        if (newAssignee && newAssignee !== prevAssignee) {
-            const sender = await User.findById(req.userId).select('name');
-            const senderName = sender?.name || 'Someone';
-            notifyUser(req.io, {
-                recipient: newAssignee,
-                sender: req.userId,
-                type: 'PROJECT_ASSIGN',
-                content: `${senderName} assigned you to "${updatedTask.title}"`,
-                link: `/workspaces/${req.params.workspaceId}/projects/${req.params.projectId}/kanban`,
-            }).catch(err => console.error('[task-reassign notify] failed:', err.message));
+        // Notify assignees who were newly added (not previously on the task).
+        if (newAssignees) {
+            const prevSet = new Set((before.assignees || []).map(a => a.toString()));
+            const added = newAssignees.filter(uid => !prevSet.has(uid));
+            if (added.length) {
+                const sender = await User.findById(req.userId).select('name');
+                const senderName = sender?.name || 'Someone';
+                for (const uid of added) {
+                    notifyUser(req.io, {
+                        recipient: uid,
+                        sender: req.userId,
+                        type: 'PROJECT_ASSIGN',
+                        content: `${senderName} assigned you to "${updatedTask.title}"`,
+                        link: `/workspaces/${req.params.workspaceId}/projects/${req.params.projectId}/kanban`,
+                    }).catch(err => console.error('[task-reassign notify] failed:', err.message));
+                }
+            }
         }
 
         req.io.to(req.params.projectId).emit('task_updated', updatedTask);

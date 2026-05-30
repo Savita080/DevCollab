@@ -25,12 +25,26 @@ const taskSchema = new mongoose.Schema({
         enum: ['P0', 'P1', 'P2'], 
         default: 'P2' 
     },
-    assignee: { 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
-        default: null 
+    // Legacy single-assignee field. Kept for backward-compat with old tasks and
+    // old clients; new code reads/writes `assignees` (array). On write we mirror
+    // the first assignee here so anything still reading `assignee` keeps working.
+    assignee: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
     },
-    dueDate: { 
+    // Multiple assignees — a task can be shared across people.
+    assignees: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    // Who created the task (and when — `createdAt` comes from timestamps).
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    dueDate: {
         type: Date, 
         default: null 
     },

@@ -15,7 +15,8 @@ import ReactionBar from '../ui/ReactionBar';
 import { ReplyButton, QuoteChip, ReplyPreview } from '../ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
 import { PriorityChip, Avatar } from '../ui/Badge';
-import { fmtDate, fmtRelative } from '../../lib/utils';
+import { fmtDate, fmtRelative, taskAssigneeIds, taskAssignees } from '../../lib/utils';
+import MultiAssigneeSelect from './MultiAssigneeSelect';
 import s from '../../styles/modules/TaskDetail.module.css';
 
 export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembers, canEdit = true }) {
@@ -35,7 +36,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
     description: currentTask.description || '',
     priority: currentTask.priority || 'P1',
     status: currentTask.status || 'To Do',
-    assignee: currentTask.assignee?._id || currentTask.assignee || '',
+    assignees: taskAssigneeIds(currentTask),
     dueDate: currentTask.dueDate ? currentTask.dueDate.slice(0, 10) : '',
     labels: currentTask.labels?.join(', ') || '',
   });
@@ -53,7 +54,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
       description: currentTask.description || '',
       priority: currentTask.priority || 'P1',
       status: currentTask.status || 'To Do',
-      assignee: currentTask.assignee?._id || currentTask.assignee || '',
+      assignees: taskAssigneeIds(currentTask),
       dueDate: currentTask.dueDate ? currentTask.dueDate.slice(0, 10) : '',
       labels: currentTask.labels?.join(', ') || '',
     });
@@ -101,8 +102,8 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
     try {
       const parsedLabels = form.labels.split(',').map(l => l.trim()).filter(Boolean);
       const payload = { ...form, labels: parsedLabels };
-      
-      if (!payload.assignee) payload.assignee = null;
+
+      // form.assignees is the authoritative array (may be empty = unassign).
       if (!payload.dueDate) payload.dueDate = null;
 
       await update(ws._id, currentProject._id, currentTask._id, payload);
@@ -217,6 +218,32 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
           )}
         </div>
 
+        {/* Assignees (read view) */}
+        {!editing && (() => {
+          const assignees = taskAssignees(currentTask).map(a => {
+            if (a.name) return a;
+            const m = wsMembers.find(m => m.user?._id === (a._id || a));
+            return m ? { _id: m.user._id, name: m.user.name, avatar: m.user.avatar } : a;
+          });
+          return (
+            <div className={s.section}>
+              <span className={s.sLabel}>Assignees</span>
+              {assignees.length === 0 ? (
+                <p className={s.desc}><em>Unassigned</em></p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {assignees.map((u, i) => (
+                    <span key={u._id || i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-2, rgba(0,0,0,0.05))', borderRadius: 999, padding: '3px 10px 3px 3px' }}>
+                      <Avatar name={u.name} src={u.avatar} size={22} />
+                      <span style={{ fontSize: 13 }}>{u.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Description */}
         <div className={s.section}>
           <span className={s.sLabel}>Description</span>
@@ -240,20 +267,12 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
               onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
             <Input label="Labels (comma separated)" placeholder="frontend, bug, auth"
               value={form.labels} onChange={e => setForm(f => ({ ...f, labels: e.target.value }))} />
-            {/* Assignee */}
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginBottom: 6, display: 'block' }}>Assignee</label>
-              <select
-                style={{ width: '100%', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 13, fontFamily: 'var(--font-body)', borderRadius: 'var(--r-sm)', padding: '8px 12px', outline: 'none' }}
-                value={form.assignee}
-                onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}
-              >
-                <option value="">Unassigned</option>
-                {wsMembers.map(m => (
-                  <option key={m.user?._id} value={m.user?._id}>{m.user?.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Assignees (multiple) */}
+            <MultiAssigneeSelect
+              members={wsMembers}
+              value={form.assignees}
+              onChange={(next) => setForm(f => ({ ...f, assignees: next }))}
+            />
           </div>
         )}
 
@@ -334,6 +353,23 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
             <Button type="submit" variant="ghost" size="sm">Post</Button>
           </form>
         </div>
+
+        {/* Created-by footer */}
+        {(() => {
+          const creator = currentTask.createdBy;
+          const creatorName = creator?.name
+            || wsMembers.find(m => m.user?._id === (creator?._id || creator))?.user?.name;
+          if (!creatorName && !currentTask.createdAt) return null;
+          return (
+            <div className={s.createdFooter} style={{ marginTop: 4, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {creator && <Avatar name={creatorName || 'U'} src={creator?.avatar} size={18} />}
+              <span>
+                Created {creatorName ? <>by <strong style={{ color: 'var(--text-2)' }}>{creatorName}</strong></> : null}
+                {currentTask.createdAt && <> on {fmtDate(currentTask.createdAt)}</>}
+              </span>
+            </div>
+          );
+        })()}
       </div>
     </Modal>
   );
