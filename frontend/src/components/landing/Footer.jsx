@@ -46,7 +46,7 @@ export default function Footer() {
         {/* Branding */}
         <div className="md:col-span-5 space-y-4">
           <div className="text-xl font-sans font-black tracking-tight" style={{ color: 'var(--text-1)' }}>
-            <span className="bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(to right, var(--indigo), var(--cyan))' }}>Real</span>Collab
+            <span className="bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(to right, var(--indigo), var(--cyan))' }}>Dev</span>Collab
           </div>
           <p className="text-sm max-w-sm leading-relaxed" style={{ color: 'var(--text-2)' }}>
             One workspace for student dev teams — Kanban, wiki, whiteboard, chat, code snippets, and AI, all in one tab.
@@ -94,7 +94,7 @@ export default function Footer() {
       </div>
 
       <div className="max-w-7xl mx-auto pt-8 flex flex-col sm:flex-row items-center justify-between text-xs gap-4 relative z-10">
-        <div>&copy; {new Date().getFullYear()} RealCollab. Built with ☕ and panic for DevFusion 2.0.</div>
+        <div>&copy; {new Date().getFullYear()} DevCollab. Built with ☕ and panic for DevFusion 2.0.</div>
         <div style={{ color: 'var(--text-2)' }}>Made for developers, by developers.</div>
       </div>
     </footer>

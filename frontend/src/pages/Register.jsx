@@ -290,7 +290,7 @@ export default function Register() {
                 className="bg-clip-text text-transparent"
                 style={{ backgroundImage: 'linear-gradient(to right, var(--violet), var(--indigo))' }}
               >
-                Real
+                Dev
               </span>
               Collab
             </Link>

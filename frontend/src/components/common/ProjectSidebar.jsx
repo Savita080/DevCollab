@@ -84,7 +84,7 @@ export default function ProjectSidebar({ project, canEdit, role }) {
       {/* Brand */}
       <button className={wsStyles.brand} onClick={() => navigate('/workspaces')}>
         <span className={wsStyles.brandName}>
-          <span className={wsStyles.brandReal}>Real</span>Collab
+          <span className={wsStyles.brandReal}>Dev</span>Collab
         </span>
       </button>
 

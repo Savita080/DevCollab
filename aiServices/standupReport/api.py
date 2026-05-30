@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Standup Report Generator",
     description=(
-        "AI-powered daily standup report service for RealCollab. "
+        "AI-powered daily standup report service for DevCollab. "
         "Generates personalised reports based on the user's workspace role: "
         "admin (bird's-eye view) or contributor (detailed per-project view). "
         "Uses LLMs for chat summarisation and project highlights."

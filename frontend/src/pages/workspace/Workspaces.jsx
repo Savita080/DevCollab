@@ -102,7 +102,7 @@ export default function Workspaces() {
       <header className={s.topbar}>
         <div className={s.brand}>
           <span className={s.brandName}>
-            <span className={s.brandReal}>Real</span>Collab
+            <span className={s.brandReal}>Dev</span>Collab
           </span>
         </div>
         <div className={s.userBox} ref={userRef} style={{ position: 'relative' }}>

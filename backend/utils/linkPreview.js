@@ -46,7 +46,7 @@ export const fetchLinkPreview = async (url, { timeoutMs = 4000 } = {}) => {
             redirect: 'follow',
             headers: {
                 // Some sites refuse default User-Agent
-                'User-Agent': 'Mozilla/5.0 (compatible; RealCollabBot/1.0; +https://realcollab.app)',
+                'User-Agent': 'Mozilla/5.0 (compatible; DevCollabBot/1.0; +https://devcollab.app)',
                 'Accept': 'text/html,application/xhtml+xml',
             },
         });

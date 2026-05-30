@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Project Progress Summary",
     description=(
-        "AI-powered project health summary for RealCollab. "
+        "AI-powered project health summary for DevCollab. "
         "Computes an ML health score (0–100) from task data and generates "
         "a structured summary with insights, velocity, deadlines, and member contributions."
     ),

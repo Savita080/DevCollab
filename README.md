@@ -2,9 +2,9 @@
 
 <br />
 
-<img src="https://img.shields.io/badge/-REALCOLLAB-1a1a2e?style=for-the-badge&labelColor=1a1a2e" alt="RealCollab" height="40" />
+<img src="https://img.shields.io/badge/-DEVCOLLAB-1a1a2e?style=for-the-badge&labelColor=1a1a2e" alt="DevCollab" height="40" />
 
-# 🚀 RealCollab
+# 🚀 DevCollab
 
 ### **One workspace. Zero context-switching. Ship faster.**
 
@@ -28,14 +28,14 @@
 
 <br />
 
-[**🌐 Live Demo**](https://real-collab-frontend.vercel.app/) · [**📖 Documentation**](docs/api/backend_api.md) · [**🚀 Quick Start**](#-quick-start) · [**🧠 Architecture**](#%EF%B8%8F-architecture) · [**💎 Pricing**](#-pricing) · [**🗺️ Roadmap**](#%EF%B8%8F-roadmap)
+[**🌐 Live Demo**](https://dev-collab-frontend.vercel.app/) · [**📖 Documentation**](docs/api/backend_api.md) · [**🚀 Quick Start**](#-quick-start) · [**🧠 Architecture**](#%EF%B8%8F-architecture) · [**💎 Pricing**](#-pricing) · [**🗺️ Roadmap**](#%EF%B8%8F-roadmap)
 
 ---
 ### Test Account
 - Email: `test@test.com`
 - Password: `test1234`
 - Workspace role in **test workspace**: **Member** (viewer permissions)
-- In **RealCollab** workspace: workspace-level **Viewer**
+- In **DevCollab** workspace: workspace-level **Viewer**
 - Project-level role in **ADD Ons** and **BUGS** projects: **Viewer**
 
 <br />
@@ -44,12 +44,12 @@
 
 </div>
 
-## 💡 Why RealCollab?
+## 💡 Why DevCollab?
 
 > Student dev teams spend more time **switching tools** than **shipping code**.
 > Tasks live in Trello. Code lives in GitHub. Notes live in Notion. Discussions die in Discord. Standups never happen because nobody wants to summarize what they did yesterday.
 
-**RealCollab** is the workspace that fixes that. Plan, code, document, draw, and chat — all in one tab — with an AI layer that handles the boring parts so your team can focus on building.
+**DevCollab** is the workspace that fixes that. Plan, code, document, draw, and chat — all in one tab — with an AI layer that handles the boring parts so your team can focus on building.
 
 <br />
 
@@ -133,7 +133,7 @@ Per-project audit trail of every action — task moves, wiki edits, role changes
 
 <div align="center">
 
-| Capability | RealCollab | Trello | Notion | Linear | Slack |
+| Capability | DevCollab | Trello | Notion | Linear | Slack |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Real-time Kanban | ✅ | ✅ | ⚠️ | ✅ | ❌ |
 | Versioned Wiki | ✅ | ❌ | ⚠️ | ❌ | ❌ |
@@ -253,7 +253,7 @@ Three independent services. Each runs on its own port. Each scales on its own.
 <summary><b>1️⃣ &nbsp; Clone the repo</b></summary>
 
 ```bash
-git clone <repo-url> RealCollab && cd RealCollab
+git clone <repo-url> DevCollab && cd DevCollab
 ```
 
 </details>
@@ -303,7 +303,7 @@ Repeat for `standupReport/`, `blocker/`, `progressSummary/`.
 
 ```bash
 curl http://localhost:3000
-# { "message": "RealCollab Backend Is running" }
+# { "message": "DevCollab Backend Is running" }
 ```
 
 Open `http://localhost:5173` and you're in. 🎉
@@ -336,7 +336,7 @@ Subscription is **per user account** — the plan governs all workspaces the use
 ## 📁 Project Structure
 
 ```
-RealCollab/
+DevCollab/
 │
 ├── 🟢 backend/                    Node.js · Express 5 · Socket.IO
 │   ├── controllers/              Domain handlers (auth, tasks, wiki, …)
@@ -516,7 +516,7 @@ Released under the **ISC License** — see [`LICENSE`](LICENSE) for details.
 
 <br />
 
-⭐ **Star us on GitHub** if RealCollab saved your team some context-switching
+⭐ **Star us on GitHub** if DevCollab saved your team some context-switching
 
 <br />
 

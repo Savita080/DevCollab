@@ -1,6 +1,6 @@
 # Daily Standup Report API Reference
 
-This API reference covers the Standup Report Generator, an AI-powered service for RealCollab that creates personalised daily standups based on a user's workspace role (admin vs contributor).
+This API reference covers the Standup Report Generator, an AI-powered service for DevCollab that creates personalised daily standups based on a user's workspace role (admin vs contributor).
 
 **Architecture:**
 This service is a **PURE COMPUTE LAYER**. The Node.js backend queries MongoDB, assembles the `StandupRequest` payload, and POSTs it here.
@@ -40,7 +40,7 @@ Generate a personalised daily standup report based on the user's workspace role.
 {
   "user_workspace_role": "ADMIN",
   "user_name": "Alice",
-  "workspace_name": "RealCollab Workspace",
+  "workspace_name": "DevCollab Workspace",
   "projects": [
     {
       "project_id": "proj_123",

@@ -193,7 +193,7 @@ export const generateInvite = async (req, res) => {
         const htmlContent = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2>You've been invited to join ${req.workspace.name}!</h2>
-                <p>You have been invited to collaborate on RealCollab as a <strong>${role || 'MEMBER'}</strong>.</p>
+                <p>You have been invited to collaborate on DevCollab as a <strong>${role || 'MEMBER'}</strong>.</p>
                 <br/>
                 <a href="${inviteLink}" style="padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Accept Invitation</a>
                 <br/><br/>

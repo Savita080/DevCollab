@@ -1,4 +1,4 @@
-// pages/About.jsx — About RealCollab
+// pages/About.jsx — About DevCollab
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
@@ -124,7 +124,7 @@ export default function About() {
               className="inline-block text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full mb-6"
               style={{ background: 'var(--accent-soft)', border: '1px solid var(--border)', color: 'var(--indigo)' }}
             >
-              About RealCollab
+              About DevCollab
             </span>
             <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-tight mb-6">
               One workspace.<br />
@@ -136,7 +136,7 @@ export default function About() {
               </span>
             </h1>
             <p className="text-xl max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--text-2)' }}>
-              RealCollab was built by a 3-person hackathon team who were tired of juggling Trello, Notion, GitHub, and Discord simultaneously.
+              DevCollab was built by a 3-person hackathon team who were tired of juggling Trello, Notion, GitHub, and Discord simultaneously.
               We built the tool we wished existed — everything a dev team needs, in a single tab.
             </p>
           </motion.div>
@@ -181,7 +181,7 @@ export default function About() {
                 summarising six different tools manually. Context-switching was eating more time than actual building.
               </p>
               <p>
-                We built RealCollab for <strong style={{ color: 'var(--text-1)' }}>DevFusion 2.0</strong> to
+                We built DevCollab for <strong style={{ color: 'var(--text-1)' }}>DevFusion 2.0</strong> to
                 solve this exactly. A single platform that handles project management, documentation, code storage,
                 real-time collaboration, <em>and</em> an AI layer that takes care of the busywork — standups,
                 code reviews, bottleneck detection — so teams can spend time shipping instead of reporting.

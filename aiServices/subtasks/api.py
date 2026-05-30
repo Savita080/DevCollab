@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="RealCollab Task Breaker",
+    title="DevCollab Task Breaker",
     description="Agentic FastAPI microservice for AI task breakdown.",
     version="1.1.0",
     lifespan=lifespan,

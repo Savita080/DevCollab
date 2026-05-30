@@ -60,7 +60,7 @@ export default function LeftPanel() {
             className="bg-clip-text text-transparent"
             style={{ backgroundImage: 'linear-gradient(to right, var(--cyan), var(--indigo))' }}
           >
-            Real
+            Dev
           </span>
           Collab
         </Link>
@@ -70,7 +70,7 @@ export default function LeftPanel() {
       <div className="relative z-10 flex-1 flex items-center justify-center pointer-events-none mt-8 mb-8">
         <motion.img
           src={mascot}
-          alt="RealCollab Mascot"
+          alt="DevCollab Mascot"
           className="w-72 lg:w-96 object-contain drop-shadow-2xl"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1, y: [0, -12, 0] }}

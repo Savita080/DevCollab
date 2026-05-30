@@ -158,7 +158,7 @@ An AI & mathematical engine that detects stalled tasks using log-normal distribu
 ```env
 # Optional if service needs direct MongoDB access (though current architecture pushes data from Node)
 MONGO_URI=mongodb://localhost:27017
-DB_NAME=realcollab
+DB_NAME=devcollab
 
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
@@ -390,7 +390,7 @@ Breaks down a high-level feature description into actionable subtasks using an L
   "projectId": "proj_998xak20",
   "featureDescription": "make a settings page",
   "context": {
-    "project_name": "RealCollab Project Management",
+    "project_name": "DevCollab Project Management",
     "project_description": "A collaborative project management tool built with Next.js on the frontend and Supabase PostgreSQL on the backend.",
     "existing_tasks": []
   }

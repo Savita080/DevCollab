@@ -103,7 +103,7 @@ app.use("/api/subscriptions", subscriptionroutes);
 app.use("/api/uploads", uploadroutes);
 
 app.get("/", (req, res) => {
-    res.json({ message: "RealCollab Backend Is running" });
+    res.json({ message: "DevCollab Backend Is running" });
 });
 
 // JSON 404 — keeps the error shape consistent with the rest of the API.

@@ -20,7 +20,7 @@
 
 ## 1. Overview
 
-RealCollab runs **three distinct code reviewers** as isolated microservices to handle different language ecosystems efficiently:
+DevCollab runs **three distinct code reviewers** as isolated microservices to handle different language ecosystems efficiently:
 1. `aiCodeReviewer` (Python)
 2. `jsReviewer` (JavaScript / TypeScript)
 3. `compiledCodeReviewer` (Java, C++, Go, etc.)
