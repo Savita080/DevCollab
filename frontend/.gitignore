@@ -1,5 +1,5 @@
 node_modules
-dist
+dist/*
 .env
 PRD_BACKEND (4).md
 testEmail.js
