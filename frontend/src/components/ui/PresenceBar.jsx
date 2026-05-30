@@ -14,7 +14,7 @@ export default function PresenceBar({ users = [], max = 5, size = 26, label }) {
         {shown.map((u, i) => (
           <div
             key={u._id || u.userId || i}
-            style={{ marginLeft: -8, border: '2px solid var(--bg)', borderRadius: '50%', zIndex: shown.length - i }}
+            style={{ display: 'flex', marginLeft: -8, border: '2px solid var(--bg)', borderRadius: '50%', zIndex: shown.length - i }}
           >
             <Avatar name={u.name} src={u.avatar} online size={size} />
           </div>

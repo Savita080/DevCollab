@@ -254,7 +254,7 @@ export default function ProjectKanban() {
                         <div className={s.cardAssignee}>
                           <div style={{ display: 'flex', paddingLeft: 6 }}>
                             {assigneeUsers.slice(0, 4).map((u, i) => (
-                              <div key={u._id || i} style={{ marginLeft: -6, border: '2px solid var(--bg)', borderRadius: '50%', zIndex: assigneeUsers.length - i }}>
+                              <div key={u._id || i} style={{ display: 'flex', marginLeft: -6, border: '2px solid var(--bg)', borderRadius: '50%', zIndex: assigneeUsers.length - i }}>
                                 <Avatar name={u.name} src={u.avatar} size={20} />
                               </div>
                             ))}
