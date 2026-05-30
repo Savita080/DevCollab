@@ -17,6 +17,9 @@ import rs from '../../styles/modules/ReplyControls.module.css';
 import { PriorityChip, Avatar } from '../ui/Badge';
 import { fmtDate, fmtRelative, taskAssigneeIds, taskAssignees } from '../../lib/utils';
 import MultiAssigneeSelect from './MultiAssigneeSelect';
+import { uploadImage, isImage } from '../../lib/upload';
+import ImageLightbox from '../ui/ImageLightbox';
+import { ImagePlus, X as XIcon } from 'lucide-react';
 import s from '../../styles/modules/TaskDetail.module.css';
 
 export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembers, canEdit = true }) {
@@ -39,13 +42,34 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
     assignees: taskAssigneeIds(currentTask),
     dueDate: currentTask.dueDate ? currentTask.dueDate.slice(0, 10) : '',
     labels: currentTask.labels?.join(', ') || '',
+    attachments: currentTask.attachments || [],
   });
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(true);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const fileInputRef = useRef(null);
   const commentsEndRef = useRef(null);
   const commentRefs = useRef({});
+
+  // Upload picked images and append to the edit form's attachment list.
+  const handleAttachFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(isImage);
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, 10)) {
+        const att = await uploadImage(file);
+        setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height }].slice(0, 10) }));
+      }
+    } catch (err) {
+      toast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Sync form state when the current task updates in store (e.g. edited elsewhere or saved)
   useEffect(() => {
@@ -254,6 +278,56 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
           )}
         </div>
 
+        {/* Attachments (images) */}
+        {(() => {
+          const imgs = editing ? (form.attachments || []) : (currentTask.attachments || []);
+          if (!editing && imgs.length === 0) return null;
+          return (
+            <div className={s.section}>
+              <span className={s.sLabel}>Attachments</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {imgs.map((att, idx) => (
+                  <div key={idx} style={{ position: 'relative', lineHeight: 0 }}>
+                    <img src={att.url} alt={att.name || 'attachment'} onClick={() => setLightboxSrc(att.url)} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+                    {editing && canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }))}
+                        title="Remove"
+                        style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}
+                      >
+                        <XIcon size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {editing && canEdit && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={(e) => { handleAttachFiles(e.target.files); e.target.value = ''; }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || (form.attachments?.length || 0) >= 10}
+                      title="Add image"
+                      style={{ width: 96, height: 96, borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}
+                    >
+                      <ImagePlus size={18} />
+                      {uploading ? 'Uploading…' : 'Add'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Edit fields */}
         {editing && canEdit && (
           <div className={s.editFields}>
@@ -371,6 +445,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
           );
         })()}
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </Modal>
   );
 }

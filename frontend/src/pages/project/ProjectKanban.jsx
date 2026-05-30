@@ -1,6 +1,6 @@
 // pages/Kanban.jsx
 import { useOutletContext } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useWorkspace } from '../../store/workspace';
 import { useTasks, TASK_COLUMNS, TASK_STATUS_COLORS } from '../../store/tasks';
 import { useUI } from '../../store/ui';
@@ -15,6 +15,8 @@ import { SkeletonCard } from '../../components/ui/Skeleton';
 import { fmtDate, taskAssignees } from '../../lib/utils';
 import TaskDetail from '../../components/kanban/TaskDetail';
 import MultiAssigneeSelect from '../../components/kanban/MultiAssigneeSelect';
+import { uploadImage, isImage } from '../../lib/upload';
+import { ImagePlus, X as XIcon } from 'lucide-react';
 import ProjectMembersModal from '../../components/ProjectMembersModal';
 import { workspaces as wsApi, projects as projectsApi } from '../../lib/api';
 import s from '../../styles/modules/Kanban.module.css';
@@ -56,8 +58,26 @@ export default function ProjectKanban() {
   const [projMembers, setProjMembers] = useState([]);
   const [form, setForm] = useState({
     title: '', description: '', priority: 'P1',
-    dueDate: '', labels: '', assignees: [], status: 'To Do',
+    dueDate: '', labels: '', assignees: [], status: 'To Do', attachments: [],
   });
+  const [creatingUpload, setCreatingUpload] = useState(false);
+  const createFileRef = useRef(null);
+
+  const handleCreateFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(isImage);
+    if (files.length === 0) return;
+    setCreatingUpload(true);
+    try {
+      for (const file of files.slice(0, 10)) {
+        const att = await uploadImage(file);
+        setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height }].slice(0, 10) }));
+      }
+    } catch (err) {
+      toast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setCreatingUpload(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentProject || !ws) return;
@@ -103,7 +123,7 @@ export default function ProjectKanban() {
       const payload = { ...form, labels };
       await create(ws._id, currentProject._id, payload);
       setCreateModal(false);
-      setForm({ title: '', description: '', priority: 'P1', dueDate: '', labels: '', assignees: [], status: 'To Do' });
+      setForm({ title: '', description: '', priority: 'P1', dueDate: '', labels: '', assignees: [], status: 'To Do', attachments: [] });
       toast('Task created', 'success');
     } catch (err) {
       toast(err?.response?.data?.message || 'Failed to create task', 'error');
@@ -309,7 +329,48 @@ export default function ProjectKanban() {
             value={form.labels} onChange={e => setForm(f => ({ ...f, labels: e.target.value }))} />
           <Input label="Due date" type="date" value={form.dueDate}
             onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
-          <Button type="submit" variant="primary" size="md">Create Task</Button>
+
+          {/* Image attachments */}
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginBottom: 6, display: 'block' }}>
+              Images
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(form.attachments || []).map((att, idx) => (
+                <div key={idx} style={{ position: 'relative', lineHeight: 0 }}>
+                  <img src={att.url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }))}
+                    title="Remove"
+                    style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}
+                  >
+                    <XIcon size={11} />
+                  </button>
+                </div>
+              ))}
+              <input
+                ref={createFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => { handleCreateFiles(e.target.files); e.target.value = ''; }}
+              />
+              <button
+                type="button"
+                onClick={() => createFileRef.current?.click()}
+                disabled={creatingUpload || (form.attachments?.length || 0) >= 10}
+                title="Add image"
+                style={{ width: 72, height: 72, borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 10 }}
+              >
+                <ImagePlus size={16} />
+                {creatingUpload ? '…' : 'Add'}
+              </button>
+            </div>
+          </div>
+
+          <Button type="submit" variant="primary" size="md" disabled={creatingUpload}>Create Task</Button>
         </form>
       </Modal>
 

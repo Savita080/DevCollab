@@ -57,7 +57,9 @@ const taskSchema = new mongoose.Schema({
     }],
     attachments: [{
         url: { type: String, required: true },
-        name: { type: String, required: true }
+        name: { type: String, default: '' },
+        width: Number,
+        height: Number
     }]
 }, {
     timestamps: true 

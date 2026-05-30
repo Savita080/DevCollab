@@ -196,6 +196,11 @@ export const ai = {
   review:    d              => api.post('/ai/review-code', d),
 };
 
+// ── Uploads (Cloudinary signed direct upload) ────────────────────────
+export const uploads = {
+  signature: () => api.get('/uploads/signature'),
+};
+
 // ── Subscriptions (Razorpay) — per-user, no workspace context ─────────
 export const subscriptions = {
   subscribe: ()  => api.post(`/subscriptions/subscribe`),

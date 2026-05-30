@@ -20,6 +20,7 @@ import whiteboardroutes from './routes/whiteboardroutes.js';
 import activityroutes from './routes/activityroutes.js';
 import workspaceactivityroutes from './routes/workspaceactivityroutes.js';
 import subscriptionroutes from './routes/subscriptionroutes.js';
+import uploadroutes from './routes/uploadroutes.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
@@ -99,6 +100,7 @@ app.use("/api/tasks/:taskId/comments", commentroutes);
 app.use("/api/notifications", notificationroutes);
 app.use("/api/ai", airoutes);
 app.use("/api/subscriptions", subscriptionroutes);
+app.use("/api/uploads", uploadroutes);
 
 app.get("/", (req, res) => {
     res.json({ message: "RealCollab Backend Is running" });

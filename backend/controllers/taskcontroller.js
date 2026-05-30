@@ -24,6 +24,12 @@ export const createTask = async (req, res) => {
         }
 
         const assignees = normalizeAssignees(req.body);
+        const attachments = Array.isArray(req.body.attachments)
+            ? req.body.attachments
+                .filter(a => a && typeof a.url === 'string' && a.url.startsWith('http'))
+                .slice(0, 10)
+                .map(a => ({ url: a.url, name: a.name || '', width: a.width, height: a.height }))
+            : [];
 
         const lastTask = await Task.findOne({ project: projectId, status: status || 'TODO' })
             .sort('-position')
@@ -41,6 +47,7 @@ export const createTask = async (req, res) => {
             assignee: assignees[0] || null, // mirror first for back-compat
             createdBy: req.userId,
             dueDate: dueDate || null,
+            attachments,
             position
         });
 
@@ -103,7 +110,7 @@ export const getProjectTasks = async (req, res) => {
 // Fields a client is allowed to change on a task. Prevents mass-assignment of
 // `project`, `position`, `createdBy`, timestamps, etc. via a crafted request body.
 // `assignees` is handled separately below (not via this allowlist).
-const TASK_UPDATABLE = ['title', 'description', 'status', 'priority', 'dueDate', 'labels'];
+const TASK_UPDATABLE = ['title', 'description', 'status', 'priority', 'dueDate', 'labels', 'attachments'];
 
 export const updateTask = async (req, res) => {
     try {
