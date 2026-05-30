@@ -166,6 +166,14 @@ export const chat = {
   sendWorkspace:     (wid, d)      => api.post(`/workspaces/${wid}/chat`, d),
   reactWorkspace:    (wid, mid, emoji) =>
     api.post(`/workspaces/${wid}/chat/${mid}/react`, { emoji }),
+  editWorkspace:     (wid, mid, content) =>
+    api.patch(`/workspaces/${wid}/chat/${mid}`, { content }),
+  deleteWorkspace:   (wid, mid) =>
+    api.delete(`/workspaces/${wid}/chat/${mid}`),
+  markWorkspaceRead: (wid) =>
+    api.post(`/workspaces/${wid}/chat/read`),
+  togglePinWorkspace:(wid, mid) =>
+    api.post(`/workspaces/${wid}/chat/${mid}/pin`),
 };
 
 // ── Activity ──────────────────────────────────────────

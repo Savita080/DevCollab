@@ -1,46 +1,64 @@
-// pages/workspace/WorkspaceChat.jsx — workspace-level chat (no project context)
+// pages/workspace/WorkspaceChat.jsx — workspace-level chat at full parity with
+// project chat: edit, delete, pin, search, read receipts, image upload, link
+// previews, scoped presence. Reuses MessageBubble so behaviour stays identical.
 import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Send } from 'lucide-react';
+import { Send, Pin, Search, X, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
 import { chat as chatApi, workspaces as wsApi } from '../../lib/api';
+import { useScopedPresence } from '../../lib/hooks';
 import { Avatar } from '../../components/ui/Badge';
+import MessageBubble from '../../components/chat/MessageBubble';
 import MentionInput from '../../components/ui/MentionInput';
 import EmojiPickerButton from '../../components/ui/EmojiPickerButton';
-import ReactionBar from '../../components/ui/ReactionBar';
-import { ReplyButton, QuoteChip, ReplyPreview } from '../../components/ui/ReplyControls';
+import { ReplyPreview } from '../../components/ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
 import { fmtRelative } from '../../lib/utils';
-import socket from '../../lib/socket';
-import { joinWorkspace, leaveWorkspace } from '../../lib/socket';
+import socket, { joinWorkspace, leaveWorkspace } from '../../lib/socket';
+import { uploadImage, isImage } from '../../lib/upload';
+import ImageLightbox from '../../components/ui/ImageLightbox';
 import s from '../../styles/modules/Chat.module.css';
 
 export default function WorkspaceChat() {
   const { workspaceId, workspace } = useOutletContext();
   const { user } = useAuth();
   const { toast } = useUI();
+  const online = useScopedPresence(workspace?._id ? `ws:${workspace._id}` : null);
 
   const [members, setMembers] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [reads, setReads] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [typingUser, setTypingUser] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [searchQ, setSearchQ] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingEmitRef = useRef(null);
   const bottomRef = useRef(null);
   const messageRefs = useRef({});
 
-  // Join workspace socket room + load history. Socket rooms are keyed by
-  // canonical _id, so use workspace?._id (slug from URL won't match the room).
+  const myId = user?.id || user?._id;
+
+  // Join workspace room + load history. Rooms are keyed by canonical _id.
   useEffect(() => {
     if (!workspaceId) return;
     const roomId = workspace?._id;
     if (roomId) joinWorkspace(roomId);
     setLoading(true);
     chatApi.workspaceMessages(workspaceId)
-      .then(({ data }) => setMessages(data.messages ?? data ?? []))
+      .then(({ data }) => {
+        setMessages(data.messages ?? data ?? []);
+        setReads(data.reads ?? []);
+      })
       .catch(() => toast('Failed to load chat', 'error'))
       .finally(() => setLoading(false));
 
@@ -51,20 +69,54 @@ export default function WorkspaceChat() {
     return () => { if (roomId) leaveWorkspace(roomId); };
   }, [workspaceId, workspace?._id]);
 
-  // Realtime new messages + typing
+  // Realtime events
   useEffect(() => {
     if (!workspaceId) return;
     const canonicalId = workspace?._id;
+    const sameWs = (id) => id === canonicalId || id === workspaceId;
+
     const onNew = (msg) => {
-      setMessages(prev => prev.some(m => m._id === msg._id) ? prev : [...prev, msg]);
+      const msgWs = msg.workspace?._id || msg.workspace;
+      if (msgWs && !sameWs(msgWs)) return;
+      setMessages(prev => {
+        if (prev.some(m => m._id === msg._id)) return prev;
+        const senderId = msg.sender?._id || msg.sender;
+        const tempIdx = prev.findIndex(m => m._optimistic && m.content === msg.content && (m.sender?._id || m.sender) === senderId);
+        if (tempIdx !== -1) { const next = [...prev]; next[tempIdx] = msg; return next; }
+        return [...prev, msg];
+      });
     };
     const onReaction = ({ scope, messageId, reactions }) => {
       if (scope !== 'workspace') return;
       setMessages(prev => prev.map(m => m._id === messageId ? { ...m, reactions } : m));
     };
+    const onEdited = ({ scope, message }) => {
+      if (scope !== 'workspace') return;
+      setMessages(prev => prev.map(m => m._id === message._id ? message : m));
+    };
+    const onDeleted = ({ scope, messageId }) => {
+      if (scope !== 'workspace') return;
+      setMessages(prev => prev.map(m => m._id === messageId ? { ...m, deletedAt: new Date().toISOString(), content: '' } : m));
+    };
+    const onPinned = ({ scope, message }) => {
+      if (scope !== 'workspace') return;
+      setMessages(prev => prev.map(m => m._id === message._id ? message : m));
+    };
+    const onLinkPreview = ({ scope, messageId, linkPreview }) => {
+      if (scope !== 'workspace') return;
+      setMessages(prev => prev.map(m => m._id === messageId ? { ...m, linkPreview } : m));
+    };
+    const onRead = ({ scope, workspaceId: wid, user: u, lastReadAt }) => {
+      if (scope !== 'workspace' || !sameWs(wid)) return;
+      setReads(prev => {
+        const idx = prev.findIndex(r => (r.user?._id || r.user) === (u?._id || u));
+        const entry = { user: u, lastReadAt };
+        if (idx === -1) return [...prev, entry];
+        const next = [...prev]; next[idx] = entry; return next;
+      });
+    };
     const onTyping = ({ workspaceId: wsId, userName }) => {
-      // Payload carries canonical _id; URL token may be slug — accept both.
-      if ((wsId === canonicalId || wsId === workspaceId) && userName !== user?.name) {
+      if (sameWs(wsId) && userName !== user?.name) {
         setTypingUser(userName);
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2500);
@@ -72,10 +124,20 @@ export default function WorkspaceChat() {
     };
     socket.on('new_workspace_message', onNew);
     socket.on('message_reaction_updated', onReaction);
+    socket.on('message_edited', onEdited);
+    socket.on('message_deleted', onDeleted);
+    socket.on('message_pinned', onPinned);
+    socket.on('message_link_preview', onLinkPreview);
+    socket.on('chat_read', onRead);
     socket.on('workspace_user_typing', onTyping);
     return () => {
       socket.off('new_workspace_message', onNew);
       socket.off('message_reaction_updated', onReaction);
+      socket.off('message_edited', onEdited);
+      socket.off('message_deleted', onDeleted);
+      socket.off('message_pinned', onPinned);
+      socket.off('message_link_preview', onLinkPreview);
+      socket.off('chat_read', onRead);
       socket.off('workspace_user_typing', onTyping);
       clearTimeout(typingTimeoutRef.current);
     };
@@ -85,23 +147,69 @@ export default function WorkspaceChat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  // Mark read when open + focused.
+  useEffect(() => {
+    if (!workspaceId || loading || messages.length === 0) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const t = setTimeout(() => { chatApi.markWorkspaceRead(workspaceId).catch(() => {}); }, 500);
+    return () => clearTimeout(t);
+  }, [workspaceId, loading, messages.length]);
+
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(isImage);
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, 6)) {
+        const att = await uploadImage(file);
+        setAttachments(prev => [...prev, att].slice(0, 6));
+      }
+    } catch (err) {
+      toast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const send = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
     const text = input.trim();
-    const replyToId = replyingTo?._id;
+    const pendingAtts = attachments;
+    if (!text && pendingAtts.length === 0) return;
+    const replyTo = replyingTo;
+    const replyToId = replyTo?._id;
     setInput('');
     setReplyingTo(null);
+    setAttachments([]);
+
+    const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const optimistic = {
+      _id: tempId,
+      _optimistic: true,
+      content: text,
+      attachments: pendingAtts,
+      sender: { _id: myId, name: user?.name, avatar: user?.avatar },
+      createdAt: new Date().toISOString(),
+      reactions: [],
+      ...(replyTo ? { replyTo: { _id: replyTo._id, content: replyTo.content, sender: replyTo.sender } } : {}),
+    };
+    setMessages(prev => [...prev, optimistic]);
     try {
       const { data } = await chatApi.sendWorkspace(workspaceId, {
         content: text,
+        ...(pendingAtts.length ? { attachments: pendingAtts } : {}),
         ...(replyToId ? { replyTo: replyToId } : {}),
       });
-      const msg = data.chatMessage ?? data;
-      setMessages(prev => prev.some(m => m._id === msg._id) ? prev : [...prev, msg]);
+      const msg = data.chatMessage ?? data.data ?? data;
+      setMessages(prev => {
+        if (prev.some(m => m._id === msg._id)) return prev.filter(m => m._id !== tempId);
+        return prev.map(m => m._id === tempId ? msg : m);
+      });
     } catch {
+      setMessages(prev => prev.filter(m => m._id !== tempId));
       setInput(text);
-      if (replyToId) setReplyingTo(replyingTo);
+      setAttachments(pendingAtts);
+      if (replyTo) setReplyingTo(replyTo);
       toast('Failed to send', 'error');
     }
   };
@@ -126,15 +234,13 @@ export default function WorkspaceChat() {
     return id === user?.id || id === user?._id;
   };
 
-  const myId = user?.id || user?._id;
   const handleReact = async (msgId, emoji) => {
     setMessages(prev => prev.map(m => {
       if (m._id !== msgId) return m;
       const reactions = [...(m.reactions || [])];
       const idx = reactions.findIndex(r => r.emoji === emoji);
-      if (idx === -1) {
-        reactions.push({ emoji, users: [myId] });
-      } else {
+      if (idx === -1) reactions.push({ emoji, users: [myId] });
+      else {
         const users = reactions[idx].users || [];
         const has = users.some(u => (u?._id || u)?.toString() === myId?.toString());
         const next = has ? users.filter(u => (u?._id || u)?.toString() !== myId?.toString()) : [...users, myId];
@@ -147,56 +253,145 @@ export default function WorkspaceChat() {
     catch { toast('Failed to react', 'error'); }
   };
 
+  const startEdit = (m) => { setEditingId(m._id); setEditingText(m.content); };
+  const cancelEdit = () => { setEditingId(null); setEditingText(''); };
+  const saveEdit = async () => {
+    const text = editingText.trim();
+    if (!text || !editingId) return cancelEdit();
+    const id = editingId;
+    const original = messages.find(m => m._id === id);
+    if (!original || original.content === text) return cancelEdit();
+    setMessages(prev => prev.map(m => m._id === id ? { ...m, content: text, editedAt: new Date().toISOString() } : m));
+    cancelEdit();
+    try { await chatApi.editWorkspace(workspaceId, id, text); }
+    catch { setMessages(prev => prev.map(m => m._id === id ? original : m)); toast('Failed to edit', 'error'); }
+  };
+  const handleTogglePin = async (msg) => {
+    const id = msg._id;
+    const wasPinned = !!msg.pinned;
+    setMessages(prev => prev.map(m => m._id === id ? { ...m, pinned: !wasPinned, pinnedAt: !wasPinned ? new Date().toISOString() : null } : m));
+    try { await chatApi.togglePinWorkspace(workspaceId, id); }
+    catch { setMessages(prev => prev.map(m => m._id === id ? { ...m, pinned: wasPinned } : m)); toast('Failed to pin', 'error'); }
+  };
+  const handleDelete = async (msgId) => {
+    if (!confirm('Delete this message?')) return;
+    const original = messages.find(m => m._id === msgId);
+    setMessages(prev => prev.map(m => m._id === msgId ? { ...m, deletedAt: new Date().toISOString(), content: '' } : m));
+    try { await chatApi.deleteWorkspace(workspaceId, msgId); }
+    catch { if (original) setMessages(prev => prev.map(m => m._id === msgId ? original : m)); toast('Failed to delete', 'error'); }
+  };
+
+  const pinned = messages.filter(m => m.pinned && !m.deletedAt);
+
   return (
     <div className={s.page}>
       <div className={s.header}>
         <div>
           <h1 className={s.title}>{workspace?.name || 'Workspace'} Chat</h1>
-          <p className={s.subtitle}>Workspace-wide conversation · {members.length} member{members.length !== 1 ? 's' : ''}</p>
+          <p className={s.subtitle}>
+            {online.length > 0 ? `${online.length} online` : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+          </p>
         </div>
-        <span className={s.livePill}>● LIVE</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+          <div style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setSearchOpen(o => !o)} title="Search messages"
+              style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center' }}>
+              <Search size={14} />
+            </button>
+            {searchOpen && (
+              <div style={{ position: 'absolute', top: '110%', right: 0, width: 320, background: 'var(--bg-dropdown, var(--bg-card, #fff))', color: 'var(--text-1)', border: '1px solid var(--border)', borderRadius: 8, padding: 8, zIndex: 10, boxShadow: '0 6px 24px rgba(0,0,0,0.18)' }}>
+                <input autoFocus type="text" placeholder="Search messages…" value={searchQ}
+                  onChange={e => setSearchQ(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQ(''); } }}
+                  style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2, transparent)', color: 'var(--text-1)', font: 'inherit', marginBottom: 6 }} />
+                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                  {searchQ.trim() === '' ? (
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 2px' }}>Type to search this chat</div>
+                  ) : (() => {
+                    const q = searchQ.toLowerCase();
+                    const hits = messages.filter(m => !m.deletedAt && (m.content || '').toLowerCase().includes(q)).slice(-30).reverse();
+                    if (hits.length === 0) return <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 2px' }}>No matches</div>;
+                    return hits.map(h => (
+                      <button key={h._id} onClick={() => { setSearchOpen(false); setSearchQ(''); jumpToMessage(h._id); }}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '6px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{h.sender?.name || 'Unknown'} · {fmtRelative(h.createdAt)}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.content}</div>
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+          {online.slice(0, 5).map(u => (
+            <Avatar key={u._id || u.userId} name={u.name} src={u.avatar} online size={26} />
+          ))}
+          <span className={s.livePill}>● LIVE</span>
+        </div>
       </div>
+
+      {pinned.length > 0 && (
+        <div style={{ borderBottom: '1px solid var(--border)', padding: '6px 12px', background: 'var(--bg-2, rgba(0,0,0,0.04))', display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            <Pin size={11} /> Pinned ({pinned.length})
+          </div>
+          {pinned.slice(0, 3).map(p => (
+            <button key={p._id} onClick={() => jumpToMessage(p._id)}
+              style={{ background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', color: 'var(--text-2)', fontSize: 12, padding: '2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Jump to message">
+              <strong style={{ marginRight: 6 }}>{p.sender?.name || 'Unknown'}:</strong>
+              {p.content || '📷 Photo'}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className={s.messages}>
         {loading && <p className={s.empty}>Loading messages…</p>}
-        {!loading && messages.length === 0 && (
-          <p className={s.empty}>No messages yet. Say hello!</p>
-        )}
-        {messages.map((m, i) => {
-          const mine = isMe(m);
-          const senderName = m.sender?.name ?? 'Unknown';
-          const prevSenderId = messages[i - 1]?.sender?._id ?? messages[i - 1]?.sender;
-          const thisSenderId = m.sender?._id ?? m.sender;
-          const showName = !mine && (i === 0 || prevSenderId !== thisSenderId);
+        {!loading && messages.length === 0 && <p className={s.empty}>No messages yet. Say hello!</p>}
+        {messages.map((m, i) => (
+          <MessageBubble
+            key={m._id ?? i}
+            m={m}
+            index={i}
+            messages={messages}
+            isMe={isMe}
+            myId={myId}
+            members={members}
+            editingId={editingId}
+            editingText={editingText}
+            setEditingText={setEditingText}
+            saveEdit={saveEdit}
+            cancelEdit={cancelEdit}
+            startEdit={startEdit}
+            handleDelete={handleDelete}
+            handleTogglePin={handleTogglePin}
+            handleReact={handleReact}
+            setReplyingTo={setReplyingTo}
+            jumpToMessage={jumpToMessage}
+            messageRefs={messageRefs}
+            onImageClick={setLightboxSrc}
+          />
+        ))}
+        {(() => {
+          const last = [...messages].reverse().find(m => !m.deletedAt);
+          if (!last) return null;
+          const lastTime = new Date(last.createdAt).getTime();
+          const seers = (reads || []).filter(r => {
+            const uid = r.user?._id || r.user;
+            if (!uid || uid === myId) return false;
+            return new Date(r.lastReadAt).getTime() >= lastTime;
+          });
+          if (seers.length === 0) return null;
           return (
-            <div
-              key={m._id ?? i}
-              ref={el => { if (m._id) messageRefs.current[m._id] = el; }}
-              className={`${s.msgGroup} ${mine ? s.mine : ''}`}
-            >
-              {showName && (
-                <div className={s.senderMeta}>
-                  <Avatar name={senderName} src={m.sender?.avatar} size={20} />
-                  <span className={s.senderName}>{senderName}</span>
-                </div>
-              )}
-              <div className={s.bubble}>
-                <QuoteChip replyTo={m.replyTo} mine={mine} onJump={jumpToMessage} />
-                <span className={s.msgText}>{m.content}</span>
-                <span className={s.msgTime}>{fmtRelative(m.createdAt)}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <ReactionBar
-                  reactions={m.reactions}
-                  currentUserId={myId}
-                  members={members}
-                  onToggle={(emoji) => handleReact(m._id, emoji)}
-                />
-                <ReplyButton onClick={() => setReplyingTo(m)} />
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, padding: '0 8px 4px', fontSize: 10, color: 'var(--text-3)' }}>
+              <span>Seen</span>
+              {seers.slice(0, 4).map(r => (
+                <Avatar key={r.user?._id || r.user} name={r.user?.name} src={r.user?.avatar} size={14} />
+              ))}
+              {seers.length > 4 && <span>+{seers.length - 4}</span>}
             </div>
           );
-        })}
+        })()}
         <div ref={bottomRef} />
       </div>
 
@@ -207,7 +402,33 @@ export default function WorkspaceChat() {
       )}
 
       <ReplyPreview replyingTo={replyingTo} onCancel={() => setReplyingTo(null)} />
+
+      {(attachments.length > 0 || uploading) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 8px' }}>
+          {attachments.map((att, idx) => (
+            <div key={idx} style={{ position: 'relative' }}>
+              <img src={att.url} alt="" onClick={() => setLightboxSrc(att.url)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+              <button type="button" onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} title="Remove"
+                style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}>
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          {uploading && (
+            <div style={{ width: 56, height: 56, borderRadius: 6, border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-3)' }}>
+              Uploading…
+            </div>
+          )}
+        </div>
+      )}
+
       <form className={s.inputRow} onSubmit={send}>
+        <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
+        <button type="button" className={s.sendBtn} title="Attach image"
+          onClick={() => fileInputRef.current?.click()} disabled={uploading || attachments.length >= 6}>
+          <ImagePlus size={14} />
+        </button>
         <MentionInput
           className={s.mentionWrap}
           inputClassName={s.input}
@@ -223,17 +444,15 @@ export default function WorkspaceChat() {
             }
           }}
         />
-        <EmojiPickerButton
-          className={s.sendBtn}
-          title="Insert emoji"
-          onSelect={(emoji) => setInput(prev => prev + emoji)}
-        >
+        <EmojiPickerButton className={s.sendBtn} title="Insert emoji" onSelect={(emoji) => setInput(prev => prev + emoji)}>
           😊
         </EmojiPickerButton>
-        <button type="submit" className={s.sendBtn} disabled={!input.trim()} title="Send">
+        <button type="submit" className={s.sendBtn} disabled={(!input.trim() && attachments.length === 0) || uploading} title="Send">
           <Send size={14} />
         </button>
       </form>
+
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 }
