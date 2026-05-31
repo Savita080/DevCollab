@@ -9,6 +9,17 @@ import './config/redis.js'; // Import Redis so it connects!
 import app, { setIo } from './app.js';
 import { setupKanbanSockets } from './sockets/kanbanSocket.js';
 import { setupWhiteboardSockets } from './sockets/whiteboardSocket.js';
+import { captureError } from './lib/sentry.js';
+
+// Last-resort safety nets: log + report crashes instead of dying silently.
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled promise rejection:', reason);
+    captureError(reason instanceof Error ? reason : new Error(String(reason)), { kind: 'unhandledRejection' });
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err);
+    captureError(err, { kind: 'uncaughtException' });
+});
 
 // Fail fast if security-critical env vars are missing — these are required for
 // auth to work at all, and a missing JWT secret silently makes tokens forgeable.

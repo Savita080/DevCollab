@@ -6,6 +6,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Test-only secrets so auth middleware/controllers work. Set before any app
 // code that reads them runs.
+process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret';
 
