@@ -42,7 +42,7 @@ export default function Contact() {
   const handleSubmit = (e) => {
     e.preventDefault();
     const body = encodeURIComponent(`Name: ${form.firstName} ${form.lastName}\nEmail: ${form.email}\n\n${form.message}`);
-    const subject = encodeURIComponent(form.subject || 'RealCollab Inquiry');
+    const subject = encodeURIComponent(form.subject || 'DevCollab Inquiry');
     const a = document.createElement('a');
     a.href = `mailto:adityaalba27@gmail.com?subject=${subject}&body=${body}`;
     document.body.appendChild(a);

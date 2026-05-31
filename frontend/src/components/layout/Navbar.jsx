@@ -42,7 +42,7 @@ export default function Navbar() {
       {/* Brand */}
       <Link to="/dashboard" className={s.brand}>
         <span className={s.wordmark}>
-          <span className={s.brandReal}>Real</span>Collab
+          <span className={s.brandReal}>Dev</span>Collab
         </span>
       </Link>
 

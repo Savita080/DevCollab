@@ -8,6 +8,24 @@ export function cn(...inputs) {
 // Alias for legacy components using `cls`
 export const cls = cn;
 
+// Back-compat reader for task assignees. Tasks may carry `assignees` (array of
+// populated user objects or ids) and/or a legacy single `assignee`. Returns a
+// normalized array of user-ish objects ({ _id, name?, avatar? }).
+export function taskAssignees(task) {
+  if (!task) return [];
+  const raw = (Array.isArray(task.assignees) && task.assignees.length)
+    ? task.assignees
+    : (task.assignee ? [task.assignee] : []);
+  return raw
+    .map(a => (a && typeof a === 'object') ? a : (a ? { _id: a } : null))
+    .filter(Boolean);
+}
+
+// Just the ids (strings) of a task's assignees.
+export function taskAssigneeIds(task) {
+  return taskAssignees(task).map(a => (a._id || a).toString());
+}
+
 // Format ISO date to MMM DD, YYYY
 export function fmtDate(dateString) {
   if (!dateString) return "";

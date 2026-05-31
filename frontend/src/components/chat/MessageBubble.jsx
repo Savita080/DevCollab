@@ -27,6 +27,7 @@ export default function MessageBubble({
   setReplyingTo,
   jumpToMessage,
   messageRefs,
+  onImageClick,
 }) {
   const mine = isMe(m);
   const senderName = m.sender?.name ?? 'Unknown';
@@ -74,7 +75,22 @@ export default function MessageBubble({
             </div>
           </div>
         ) : (
-          <span className={s.msgText}><MessageBody text={m.content} /></span>
+          m.content && <span className={s.msgText}><MessageBody text={m.content} /></span>
+        )}
+        {/* Image attachments */}
+        {!m.deletedAt && editingId !== m._id && m.attachments?.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: m.content ? 6 : 0 }}>
+            {m.attachments.map((att, idx) => (
+              <img
+                key={idx}
+                src={att.url}
+                alt="attachment"
+                loading="lazy"
+                onClick={() => onImageClick?.(att.url)}
+                style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'zoom-in' }}
+              />
+            ))}
+          </div>
         )}
         {m.linkPreview?.url && !m.deletedAt && editingId !== m._id && (
           <a

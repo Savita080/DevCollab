@@ -119,7 +119,7 @@ export default function Sidebar() {
         {/* Brand */}
         <div className={s.brand}>
           <span className={s.brandName}>
-            <span className={s.brandReal}>Real</span>Collab
+            <span className={s.brandReal}>Dev</span>Collab
           </span>
         </div>
 

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Pre-push hook: run the backend test suite before allowing a push.
+# If tests fail, the push is aborted so broken code never reaches the shared branch.
+#
+# Activate once per machine (from repo root):
+#   git config core.hooksPath .githooks
+#
+# Bypass in an emergency (use sparingly):
+#   git push --no-verify
+
+echo "[pre-push] Running backend tests..."
+
+cd "$(git rev-parse --show-toplevel)/backend" || exit 1
+
+npm test
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "[pre-push] ❌ Tests failed — push aborted."
+  echo "[pre-push] Fix the failing tests, or re-run with 'git push --no-verify' to bypass (not recommended)."
+  exit 1
+fi
+
+echo "[pre-push] ✅ Tests passed."
+exit 0

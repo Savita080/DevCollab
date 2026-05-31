@@ -15,7 +15,18 @@ export const sendMessage = async (req, res) => {
         const { projectId } = req.params;
         const { content, replyTo } = req.body;
 
-        if (!content) return res.status(400).json({ message: "Message content is required" });
+        // Sanitize attachments: keep only well-formed { url } entries (max 6).
+        const attachments = Array.isArray(req.body.attachments)
+            ? req.body.attachments
+                .filter(a => a && typeof a.url === 'string' && a.url.startsWith('http'))
+                .slice(0, 6)
+                .map(a => ({ url: a.url, width: a.width, height: a.height }))
+            : [];
+
+        // A message must have text OR at least one image.
+        if (!content?.trim() && attachments.length === 0) {
+            return res.status(400).json({ message: "Message content or an image is required" });
+        }
 
         // Validate replyTo belongs to the same project — prevents cross-channel quoting.
         let validReplyTo = null;
@@ -27,7 +38,8 @@ export const sendMessage = async (req, res) => {
         const newMessage = await ProjectMessage.create({
             project: projectId,
             sender: req.userId,
-            content,
+            content: content || '',
+            attachments,
             replyTo: validReplyTo,
         });
 
@@ -51,7 +63,8 @@ export const sendMessage = async (req, res) => {
 
         // Notify @mentioned users (scoped to project members + ws admins)
         const senderName = populatedMessage.sender?.name || 'Someone';
-        const snippet = content.slice(0, 80) + (content.length > 80 ? '…' : '');
+        const snippetText = content || (attachments.length ? '📷 Photo' : '');
+        const snippet = snippetText.slice(0, 80) + (snippetText.length > 80 ? '…' : '');
         const wsSlug = workspace?.slug || req.params.workspaceId;
         const projSlug = project?.slug || projectId;
         const chatLink = `/workspaces/${wsSlug}/projects/${projSlug}/chat`;

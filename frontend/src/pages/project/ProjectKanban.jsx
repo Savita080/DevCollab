@@ -1,6 +1,6 @@
 // pages/Kanban.jsx
 import { useOutletContext } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useWorkspace } from '../../store/workspace';
 import { useTasks, TASK_COLUMNS, TASK_STATUS_COLORS } from '../../store/tasks';
 import { useUI } from '../../store/ui';
@@ -12,8 +12,11 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { Input, Textarea, Select } from '../../components/ui/Input';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { fmtDate } from '../../lib/utils';
+import { fmtDate, taskAssignees } from '../../lib/utils';
 import TaskDetail from '../../components/kanban/TaskDetail';
+import MultiAssigneeSelect from '../../components/kanban/MultiAssigneeSelect';
+import { uploadImage, isImage } from '../../lib/upload';
+import { ImagePlus, X as XIcon } from 'lucide-react';
 import ProjectMembersModal from '../../components/ProjectMembersModal';
 import { workspaces as wsApi, projects as projectsApi } from '../../lib/api';
 import s from '../../styles/modules/Kanban.module.css';
@@ -55,8 +58,26 @@ export default function ProjectKanban() {
   const [projMembers, setProjMembers] = useState([]);
   const [form, setForm] = useState({
     title: '', description: '', priority: 'P1',
-    dueDate: '', labels: '', assignee: '', status: 'To Do',
+    dueDate: '', labels: '', assignees: [], status: 'To Do', attachments: [],
   });
+  const [creatingUpload, setCreatingUpload] = useState(false);
+  const createFileRef = useRef(null);
+
+  const handleCreateFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(isImage);
+    if (files.length === 0) return;
+    setCreatingUpload(true);
+    try {
+      for (const file of files.slice(0, 10)) {
+        const att = await uploadImage(file);
+        setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height }].slice(0, 10) }));
+      }
+    } catch (err) {
+      toast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setCreatingUpload(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentProject || !ws) return;
@@ -100,10 +121,9 @@ export default function ProjectKanban() {
     try {
       const labels = form.labels.split(',').map(l => l.trim()).filter(Boolean);
       const payload = { ...form, labels };
-      if (!payload.assignee) delete payload.assignee;
       await create(ws._id, currentProject._id, payload);
       setCreateModal(false);
-      setForm({ title: '', description: '', priority: 'P1', dueDate: '', labels: '', assignee: '', status: 'To Do' });
+      setForm({ title: '', description: '', priority: 'P1', dueDate: '', labels: '', assignees: [], status: 'To Do', attachments: [] });
       toast('Task created', 'success');
     } catch (err) {
       toast(err?.response?.data?.message || 'Failed to create task', 'error');
@@ -186,10 +206,13 @@ export default function ProjectKanban() {
                   <><SkeletonCard /><SkeletonCard /></>
                 )}
                 {(columns[col.key] || []).map(task => {
-                  const assigneeName = task.assignee?.name ||
-                    wsMembers.find(m => m.user?._id === task.assignee)?.user?.name;
-                  const assigneeAvatar = task.assignee?.avatar ||
-                    wsMembers.find(m => m.user?._id === task.assignee)?.user?.avatar;
+                  // Resolve each assignee to a display name/avatar, falling back to
+                  // the workspace member list when the task only carries ids.
+                  const assigneeUsers = taskAssignees(task).map(a => {
+                    if (a.name) return a;
+                    const m = wsMembers.find(m => m.user?._id === (a._id || a));
+                    return m ? { _id: m.user._id, name: m.user.name, avatar: m.user.avatar } : a;
+                  });
                   return (
                     <div
                       key={task._id}
@@ -246,11 +269,21 @@ export default function ProjectKanban() {
                           ))}
                         </div>
                       )}
-                      {/* Assignee avatar */}
-                      {assigneeName && (
+                      {/* Assignees */}
+                      {assigneeUsers.length > 0 && (
                         <div className={s.cardAssignee}>
-                          <Avatar name={assigneeName} src={assigneeAvatar} size={20} />
-                          <span className={s.assigneeName}>{assigneeName}</span>
+                          <div style={{ display: 'flex', paddingLeft: 6 }}>
+                            {assigneeUsers.slice(0, 4).map((u, i) => (
+                              <div key={u._id || i} style={{ display: 'flex', marginLeft: -6, border: '2px solid var(--bg)', borderRadius: '50%', zIndex: assigneeUsers.length - i }}>
+                                <Avatar name={u.name} src={u.avatar} size={20} />
+                              </div>
+                            ))}
+                          </div>
+                          <span className={s.assigneeName}>
+                            {assigneeUsers.length === 1
+                              ? assigneeUsers[0].name
+                              : `${assigneeUsers.length} assignees`}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -286,27 +319,58 @@ export default function ProjectKanban() {
           <Select label="Priority" value={form.priority}
             onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}
             options={['P0', 'P1', 'P2']} />
-          {/* Assignee */}
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginBottom: 6, display: 'block' }}>
-              Assignee
-            </label>
-            <select
-              className={s.assigneeSelect}
-              value={form.assignee}
-              onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}
-            >
-              <option value="">Unassigned</option>
-              {projMembers.map(m => (
-                <option key={m.user?._id} value={m.user?._id}>{m.user?.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Assignees (multiple) */}
+          <MultiAssigneeSelect
+            members={projMembers}
+            value={form.assignees}
+            onChange={(next) => setForm(f => ({ ...f, assignees: next }))}
+          />
           <Input label="Labels (comma separated)" placeholder="frontend, bug, auth"
             value={form.labels} onChange={e => setForm(f => ({ ...f, labels: e.target.value }))} />
           <Input label="Due date" type="date" value={form.dueDate}
             onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
-          <Button type="submit" variant="primary" size="md">Create Task</Button>
+
+          {/* Image attachments */}
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginBottom: 6, display: 'block' }}>
+              Images
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(form.attachments || []).map((att, idx) => (
+                <div key={idx} style={{ position: 'relative', lineHeight: 0 }}>
+                  <img src={att.url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }))}
+                    title="Remove"
+                    style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}
+                  >
+                    <XIcon size={11} />
+                  </button>
+                </div>
+              ))}
+              <input
+                ref={createFileRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => { handleCreateFiles(e.target.files); e.target.value = ''; }}
+              />
+              <button
+                type="button"
+                onClick={() => createFileRef.current?.click()}
+                disabled={creatingUpload || (form.attachments?.length || 0) >= 10}
+                title="Add image"
+                style={{ width: 72, height: 72, borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 10 }}
+              >
+                <ImagePlus size={16} />
+                {creatingUpload ? '…' : 'Add'}
+              </button>
+            </div>
+          </div>
+
+          <Button type="submit" variant="primary" size="md" disabled={creatingUpload}>Create Task</Button>
         </form>
       </Modal>
 

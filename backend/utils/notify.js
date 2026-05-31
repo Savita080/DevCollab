@@ -52,7 +52,7 @@ export async function notifyUser(io, { recipient, sender, type, content, link })
             const recipientUser = await User.findById(recipient).select('pushSubscriptions');
             if (recipientUser?.pushSubscriptions?.length) {
                 sendPushToUser(recipientUser, {
-                    title: sender ? `${populated.sender?.name || 'Someone'} on RealCollab` : 'RealCollab',
+                    title: sender ? `${populated.sender?.name || 'Someone'} on DevCollab` : 'DevCollab',
                     body: content,
                     link: link || '/',
                 }).catch(err => console.error('[push send] failed:', err.message));

@@ -3,6 +3,7 @@
 // Drop this next to TaskDetail.jsx and import it in ProjectKanban.jsx.
 
 import { useState, useRef, useEffect } from 'react';
+import { taskAssigneeIds } from '../../lib/utils';
 import s from '../../styles/modules/KanbanFilters.module.css';
 
 const PRIORITIES = [
@@ -251,14 +252,14 @@ function Divider() {
 export function applyFilters(tasks, filters, currentUserId) {
   let result = tasks;
 
-  // Assignee
+  // Assignee — tasks may have multiple assignees now.
   if (filters.assignees?.length) {
     result = result.filter(t => {
-      const aid = t.assignee?._id || t.assignee || null;
+      const ids = taskAssigneeIds(t);
       return filters.assignees.some(f => {
-        if (f === '__me__')         return aid === currentUserId;
-        if (f === '__unassigned__') return !aid;
-        return aid === f;
+        if (f === '__me__')         return ids.includes(currentUserId?.toString());
+        if (f === '__unassigned__') return ids.length === 0;
+        return ids.includes(f?.toString());
       });
     });
   }

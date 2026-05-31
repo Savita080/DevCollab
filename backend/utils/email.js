@@ -15,7 +15,7 @@ export const sendEmail = async (toEmail, subject, htmlContent) => {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                sender: { name: "RealCollab", email: senderEmail },
+                sender: { name: "DevCollab", email: senderEmail },
                 to: [{ email: toEmail }],
                 subject: subject,
                 htmlContent: htmlContent

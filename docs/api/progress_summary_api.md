@@ -1,6 +1,6 @@
 # Project Progress Summary API Reference
 
-This API reference covers the Project Progress Summary service, an AI-powered project health summary for RealCollab.
+This API reference covers the Project Progress Summary service, an AI-powered project health summary for DevCollab.
 
 **Architecture:**
 This service is a **PURE COMPUTE LAYER**. The Node.js backend queries MongoDB, assembles the `SummaryRequest` payload, and POSTs it here. This service never touches MongoDB directly.

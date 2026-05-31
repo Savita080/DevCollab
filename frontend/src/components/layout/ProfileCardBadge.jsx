@@ -54,7 +54,7 @@ export default function ProfileCardBadge({ user, onClose, onLogout, style }) {
 
         {/* Top Half of Card (Indigo Brand & Info) */}
         <div className={s.topHalf}>
-          <div className={s.cardBrand}>RealCollab</div>
+          <div className={s.cardBrand}>DevCollab</div>
           
           <div className={s.avatarContainer}>
             <div className={s.photoBorder}>

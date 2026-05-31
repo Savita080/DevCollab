@@ -11,7 +11,7 @@ load_dotenv()
 class Settings:
     # ── MongoDB ────────────────────────────────────────────────────────────────
     MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-    DB_NAME: str = os.getenv("DB_NAME", "realcollab")
+    DB_NAME: str = os.getenv("DB_NAME", "devcollab")
 
     # ── Grok
     GROK_API_KEY: str = os.getenv("GROK_API_KEY", "")

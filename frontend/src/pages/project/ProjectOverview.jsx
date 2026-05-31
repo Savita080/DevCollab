@@ -10,7 +10,7 @@ import { activity as activityApi, workspaces as wsApi, projects as projApi, ai a
 import { useWorkspaceRole } from '../../lib/useWorkspaceRole';
 import { usePresence } from '../../lib/hooks';
 import { joinProject, leaveProject } from '../../lib/socket';
-import { fmtRelative } from '../../lib/utils';
+import { fmtRelative, taskAssigneeIds } from '../../lib/utils';
 import { Avatar } from '../../components/ui/Badge';
 import PresenceBar from '../../components/ui/PresenceBar';
 import Button from '../../components/ui/Button';
@@ -100,7 +100,8 @@ export default function ProjectOverview() {
   const activeTasks  = tasks.filter(t => t.status !== 'Done').length;
   const doneTasks    = tasks.filter(t => t.status === 'Done').length;
   const blockers     = tasks.filter(t => t.priority === 'P0' && t.status !== 'Done').length;
-  const myTasks      = tasks.filter(t => t.assignee === user?.id || t.assignee?._id === user?.id || !t.assignee).slice(0, 5);
+  const myId         = user?.id || user?._id;
+  const myTasks      = tasks.filter(t => { const ids = taskAssigneeIds(t); return ids.length === 0 || ids.includes(myId?.toString()); }).slice(0, 5);
 
   // Sprint progress per project
   const sprintProgress = projects.map((p, i) => {

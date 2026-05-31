@@ -156,7 +156,7 @@ export default function Hero() {
 
       </div>
 
-      {/* Right: Realistic RealCollab App Mock */}
+      {/* Right: Realistic DevCollab App Mock */}
       <div className="lg:col-span-6 flex items-center justify-center relative min-h-[520px]">
         {/* Glow */}
         <div
@@ -194,7 +194,7 @@ export default function Hero() {
                 <div className="w-3 h-3 rounded-full" style={{ background: 'var(--status-success)' }} />
               </div>
               <div className="text-xs font-mono" style={{ color: 'var(--text-3)' }}>
-                RealCollab · Auth System
+                DevCollab · Auth System
               </div>
               {/* Live presence dots */}
               <div className="flex items-center gap-1.5">

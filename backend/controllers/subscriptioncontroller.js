@@ -3,10 +3,22 @@ import crypto from 'crypto';
 import User from '../models/user.js';
 import { PLAN_LIMITS } from '../middleware/planLimits.js';
 
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Lazily construct the Razorpay client on first use. Building it eagerly at
+// import time throws when RAZORPAY_* keys are absent (e.g. CI/tests), which
+// would crash the whole app on import. This defers that to actual payment calls.
+let _razorpay = null;
+function getRazorpay() {
+    if (!_razorpay) {
+        if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+            throw Object.assign(new Error('Payments are not configured on the server.'), { status: 503 });
+        }
+        _razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+    }
+    return _razorpay;
+}
 
 const PRO_AMOUNT = 49900; // ₹499 in paise
 
@@ -19,7 +31,7 @@ export const createOrder = async (req, res) => {
             return res.status(400).json({ message: "Already on Pro plan" });
         }
 
-        const order = await razorpay.orders.create({
+        const order = await getRazorpay().orders.create({
             amount: PRO_AMOUNT,
             currency: 'INR',
             receipt: `user_${Date.now()}`,

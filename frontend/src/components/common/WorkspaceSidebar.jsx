@@ -79,7 +79,7 @@ export default function WorkspaceSidebar({ role }) {
         {/* Brand */}
         <button className={s.brand} onClick={() => navigate('/workspaces')}>
           <span className={s.brandName}>
-            <span className={s.brandReal}>Real</span>Collab
+            <span className={s.brandReal}>Dev</span>Collab
           </span>
         </button>
 

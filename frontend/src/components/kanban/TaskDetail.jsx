@@ -15,7 +15,11 @@ import ReactionBar from '../ui/ReactionBar';
 import { ReplyButton, QuoteChip, ReplyPreview } from '../ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
 import { PriorityChip, Avatar } from '../ui/Badge';
-import { fmtDate, fmtRelative } from '../../lib/utils';
+import { fmtDate, fmtRelative, taskAssigneeIds, taskAssignees } from '../../lib/utils';
+import MultiAssigneeSelect from './MultiAssigneeSelect';
+import { uploadImage, isImage } from '../../lib/upload';
+import ImageLightbox from '../ui/ImageLightbox';
+import { ImagePlus, X as XIcon } from 'lucide-react';
 import s from '../../styles/modules/TaskDetail.module.css';
 
 export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembers, canEdit = true }) {
@@ -35,16 +39,37 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
     description: currentTask.description || '',
     priority: currentTask.priority || 'P1',
     status: currentTask.status || 'To Do',
-    assignee: currentTask.assignee?._id || currentTask.assignee || '',
+    assignees: taskAssigneeIds(currentTask),
     dueDate: currentTask.dueDate ? currentTask.dueDate.slice(0, 10) : '',
     labels: currentTask.labels?.join(', ') || '',
+    attachments: currentTask.attachments || [],
   });
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(true);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const fileInputRef = useRef(null);
   const commentsEndRef = useRef(null);
   const commentRefs = useRef({});
+
+  // Upload picked images and append to the edit form's attachment list.
+  const handleAttachFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(isImage);
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, 10)) {
+        const att = await uploadImage(file);
+        setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height }].slice(0, 10) }));
+      }
+    } catch (err) {
+      toast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Sync form state when the current task updates in store (e.g. edited elsewhere or saved)
   useEffect(() => {
@@ -53,7 +78,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
       description: currentTask.description || '',
       priority: currentTask.priority || 'P1',
       status: currentTask.status || 'To Do',
-      assignee: currentTask.assignee?._id || currentTask.assignee || '',
+      assignees: taskAssigneeIds(currentTask),
       dueDate: currentTask.dueDate ? currentTask.dueDate.slice(0, 10) : '',
       labels: currentTask.labels?.join(', ') || '',
     });
@@ -101,8 +126,8 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
     try {
       const parsedLabels = form.labels.split(',').map(l => l.trim()).filter(Boolean);
       const payload = { ...form, labels: parsedLabels };
-      
-      if (!payload.assignee) payload.assignee = null;
+
+      // form.assignees is the authoritative array (may be empty = unassign).
       if (!payload.dueDate) payload.dueDate = null;
 
       await update(ws._id, currentProject._id, currentTask._id, payload);
@@ -217,6 +242,32 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
           )}
         </div>
 
+        {/* Assignees (read view) */}
+        {!editing && (() => {
+          const assignees = taskAssignees(currentTask).map(a => {
+            if (a.name) return a;
+            const m = wsMembers.find(m => m.user?._id === (a._id || a));
+            return m ? { _id: m.user._id, name: m.user.name, avatar: m.user.avatar } : a;
+          });
+          return (
+            <div className={s.section}>
+              <span className={s.sLabel}>Assignees</span>
+              {assignees.length === 0 ? (
+                <p className={s.desc}><em>Unassigned</em></p>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {assignees.map((u, i) => (
+                    <span key={u._id || i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-2, rgba(0,0,0,0.05))', borderRadius: 999, padding: '3px 10px 3px 3px' }}>
+                      <Avatar name={u.name} src={u.avatar} size={22} />
+                      <span style={{ fontSize: 13 }}>{u.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Description */}
         <div className={s.section}>
           <span className={s.sLabel}>Description</span>
@@ -226,6 +277,56 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
             <p className={s.desc}>{currentTask.description || <em>No description</em>}</p>
           )}
         </div>
+
+        {/* Attachments (images) */}
+        {(() => {
+          const imgs = editing ? (form.attachments || []) : (currentTask.attachments || []);
+          if (!editing && imgs.length === 0) return null;
+          return (
+            <div className={s.section}>
+              <span className={s.sLabel}>Attachments</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {imgs.map((att, idx) => (
+                  <div key={idx} style={{ position: 'relative', lineHeight: 0 }}>
+                    <img src={att.url} alt={att.name || 'attachment'} onClick={() => setLightboxSrc(att.url)} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+                    {editing && canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }))}
+                        title="Remove"
+                        style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}
+                      >
+                        <XIcon size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {editing && canEdit && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={(e) => { handleAttachFiles(e.target.files); e.target.value = ''; }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading || (form.attachments?.length || 0) >= 10}
+                      title="Add image"
+                      style={{ width: 96, height: 96, borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}
+                    >
+                      <ImagePlus size={18} />
+                      {uploading ? 'Uploading…' : 'Add'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Edit fields */}
         {editing && canEdit && (
@@ -240,20 +341,12 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
               onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
             <Input label="Labels (comma separated)" placeholder="frontend, bug, auth"
               value={form.labels} onChange={e => setForm(f => ({ ...f, labels: e.target.value }))} />
-            {/* Assignee */}
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginBottom: 6, display: 'block' }}>Assignee</label>
-              <select
-                style={{ width: '100%', background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: 13, fontFamily: 'var(--font-body)', borderRadius: 'var(--r-sm)', padding: '8px 12px', outline: 'none' }}
-                value={form.assignee}
-                onChange={e => setForm(f => ({ ...f, assignee: e.target.value }))}
-              >
-                <option value="">Unassigned</option>
-                {wsMembers.map(m => (
-                  <option key={m.user?._id} value={m.user?._id}>{m.user?.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Assignees (multiple) */}
+            <MultiAssigneeSelect
+              members={wsMembers}
+              value={form.assignees}
+              onChange={(next) => setForm(f => ({ ...f, assignees: next }))}
+            />
           </div>
         )}
 
@@ -334,7 +427,25 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
             <Button type="submit" variant="ghost" size="sm">Post</Button>
           </form>
         </div>
+
+        {/* Created-by footer */}
+        {(() => {
+          const creator = currentTask.createdBy;
+          const creatorName = creator?.name
+            || wsMembers.find(m => m.user?._id === (creator?._id || creator))?.user?.name;
+          if (!creatorName && !currentTask.createdAt) return null;
+          return (
+            <div className={s.createdFooter} style={{ marginTop: 4, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {creator && <Avatar name={creatorName || 'U'} src={creator?.avatar} size={18} />}
+              <span>
+                Created {creatorName ? <>by <strong style={{ color: 'var(--text-2)' }}>{creatorName}</strong></> : null}
+                {currentTask.createdAt && <> on {fmtDate(currentTask.createdAt)}</>}
+              </span>
+            </div>
+          );
+        })()}
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </Modal>
   );
 }

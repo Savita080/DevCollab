@@ -1,6 +1,6 @@
 # Task Breaker API Reference
 
-This API reference covers the RealCollab Task Breaker service, an agentic FastAPI microservice for AI task breakdown. It splits high-level feature requests into granular subtasks.
+This API reference covers the DevCollab Task Breaker service, an agentic FastAPI microservice for AI task breakdown. It splits high-level feature requests into granular subtasks.
 
 **Architecture:**
 Uses a 2-step pipeline. Step 1 analyzes a feature request and can ask clarifying questions. Step 2 generates the actual subtasks incorporating answers to those questions.

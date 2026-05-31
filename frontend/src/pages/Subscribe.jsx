@@ -87,7 +87,7 @@ export default function Subscribe() {
         amount,
         currency,
         order_id: orderId,
-        name: 'RealCollab',
+        name: 'DevCollab',
         description: 'PRO Plan Subscription',
         prefill: { email: user?.email, name: user?.name },
         theme: { color: '#6366f1' },

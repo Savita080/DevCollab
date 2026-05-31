@@ -23,7 +23,7 @@ export default function Navbar() {
               className="bg-clip-text text-transparent"
               style={{ backgroundImage: 'linear-gradient(to right, var(--indigo), var(--cyan))' }}
             >
-              Real
+              Dev
             </span>
             Collab
           </span>

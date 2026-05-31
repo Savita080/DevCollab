@@ -9,6 +9,8 @@ import { useUI } from '../../store/ui';
 import { useWorkspace } from '../../store/workspace';
 import { workspaces as wsApi, projects as projApi, activity as actApi } from '../../lib/api';
 import { Avatar } from '../../components/ui/Badge';
+import PresenceBar from '../../components/ui/PresenceBar';
+import { useScopedPresence } from '../../lib/hooks';
 import { Skeleton } from '../../components/ui/Skeleton';
 import Button from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
@@ -23,6 +25,7 @@ export default function WorkspaceOverview() {
   const { toast } = useUI();
   const { projects, refreshProjects, createProject } = useWorkspace();
   const navigate = useNavigate();
+  const online = useScopedPresence(workspace?._id ? `ws:${workspace._id}` : null);
 
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +101,11 @@ export default function WorkspaceOverview() {
           </p>
         </div>
         <div className={s.heroBtns}>
+          {online.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 4 }}>
+              <PresenceBar users={online} size={28} label="online" />
+            </div>
+          )}
           {canCreate && (
             <Button variant="primary" size="md" onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New Project

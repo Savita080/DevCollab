@@ -1,11 +1,13 @@
 {
-  "name": "realcollab",
+  "name": "devcollab",
   "version": "1.0.0",
   "description": "",
   "main": "main.js",
   "scripts": {
     "start": "node main.js",
-    "dev": "nodemon main.js"
+    "dev": "nodemon main.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +15,7 @@
   "type": "module",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -23,5 +26,10 @@
     "razorpay": "^2.9.6",
     "socket.io": "^4.8.3",
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.2.0",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.7"
   }
 }

@@ -1,7 +1,7 @@
 // pages/project/ProjectChat.jsx — project-level chat (no whiteboard, no ws chat)
 import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Send, Pencil, Trash2, Check, X, Pin, PinOff, Search } from 'lucide-react';
+import { Send, Pencil, Trash2, Check, X, Pin, PinOff, Search, ImagePlus } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
 import { useScopedPresence } from '../../lib/hooks';
@@ -17,6 +17,8 @@ import rs from '../../styles/modules/ReplyControls.module.css';
 import { fmtRelative } from '../../lib/utils';
 import { emitTyping } from '../../lib/socket';
 import socket from '../../lib/socket';
+import { uploadImage, isImage } from '../../lib/upload';
+import ImageLightbox from '../../components/ui/ImageLightbox';
 import s from '../../styles/modules/Chat.module.css';
 import ChatHeader from '../../components/chat/ChatHeader';
 import ChatPinned from '../../components/chat/ChatPinned';
@@ -43,6 +45,10 @@ export default function ProjectChat() {
   const [editingText, setEditingText] = useState('');
   const [searchQ, setSearchQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [attachments, setAttachments] = useState([]); // [{ url, width, height }]
+  const [uploading, setUploading] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingEmitRef = useRef(null);
   const bottomRef = useRef(null);
@@ -162,17 +168,38 @@ export default function ProjectChat() {
     return () => clearTimeout(t);
   }, [workspaceId, projectId, loading, messages.length, project?._id]);
 
+  // Upload picked image files, appending results to the pending attachment strip.
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []).filter(isImage);
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const file of files.slice(0, 6)) {
+        const att = await uploadImage(file);
+        setAttachments(prev => [...prev, att].slice(0, 6));
+      }
+    } catch (err) {
+      toast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const send = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
     const text = input.trim();
+    const pendingAtts = attachments;
+    // Need text OR at least one image.
+    if (!text && pendingAtts.length === 0) return;
     const replyTo = replyingTo;
     const replyToId = replyTo?._id;
     setInput('');
     setReplyingTo(null);
+    setAttachments([]);
 
     // Slash command: /task <title> creates a Kanban task and posts a chat
     // record with a link to the new card. Priority hint: trailing !p0/!p1/!p2.
+    // (Slash commands are text-only — ignore any attached images here.)
     const taskMatch = text.match(/^\/task\s+(.+)$/i);
     if (taskMatch) {
       let title = taskMatch[1].trim();
@@ -202,6 +229,7 @@ export default function ProjectChat() {
       _id: tempId,
       _optimistic: true,
       content: text,
+      attachments: pendingAtts,
       sender: { _id: user?.id || user?._id, name: user?.name, avatar: user?.avatar },
       createdAt: new Date().toISOString(),
       reactions: [],
@@ -211,6 +239,7 @@ export default function ProjectChat() {
     try {
       const { data } = await chatApi.sendProject(workspaceId, projectId, {
         content: text,
+        ...(pendingAtts.length ? { attachments: pendingAtts } : {}),
         ...(replyToId ? { replyTo: replyToId } : {}),
       });
       const msg = data.chatMessage ?? data;
@@ -221,6 +250,7 @@ export default function ProjectChat() {
     } catch {
       setMessages(prev => prev.filter(m => m._id !== tempId));
       setInput(text);
+      setAttachments(pendingAtts);
       if (replyTo) setReplyingTo(replyTo);
       toast('Failed to send', 'error');
     }
@@ -353,6 +383,7 @@ export default function ProjectChat() {
             setReplyingTo={setReplyingTo}
             jumpToMessage={jumpToMessage}
             messageRefs={messageRefs}
+            onImageClick={setLightboxSrc}
           />
         ))}
         {(() => {
@@ -387,7 +418,49 @@ export default function ProjectChat() {
       )}
 
       <ReplyPreview replyingTo={replyingTo} onCancel={() => setReplyingTo(null)} />
+
+      {/* Pending image attachments */}
+      {(attachments.length > 0 || uploading) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 8px' }}>
+          {attachments.map((att, idx) => (
+            <div key={idx} style={{ position: 'relative' }}>
+              <img src={att.url} alt="" onClick={() => setLightboxSrc(att.url)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+              <button
+                type="button"
+                onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                title="Remove"
+                style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          {uploading && (
+            <div style={{ width: 56, height: 56, borderRadius: 6, border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-3)' }}>
+              Uploading…
+            </div>
+          )}
+        </div>
+      )}
+
       <form className={s.inputRow} onSubmit={send}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
+        />
+        <button
+          type="button"
+          className={s.sendBtn}
+          title="Attach image"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || attachments.length >= 6}
+        >
+          <ImagePlus size={14} />
+        </button>
         <MentionInput
           className={s.mentionWrap}
           inputClassName={s.input}
@@ -409,10 +482,12 @@ export default function ProjectChat() {
         >
           😊
         </EmojiPickerButton>
-        <button type="submit" className={s.sendBtn} disabled={!input.trim()} title="Send">
+        <button type="submit" className={s.sendBtn} disabled={(!input.trim() && attachments.length === 0) || uploading} title="Send">
           <Send size={14} />
         </button>
       </form>
+
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 }

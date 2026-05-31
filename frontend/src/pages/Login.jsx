@@ -89,7 +89,7 @@ export default function Login() {
               className="bg-clip-text text-transparent"
               style={{ backgroundImage: 'linear-gradient(to right, var(--cyan), var(--indigo))' }}
             >
-              Real
+              Dev
             </span>
             Collab
           </div>

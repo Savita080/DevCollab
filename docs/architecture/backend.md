@@ -1,6 +1,6 @@
 # Backend Architecture & Technologies
 
-The RealCollab backend is built with a robust, modern Node.js stack designed for real-time collaboration, horizontal scalability, and seamless integration with multiple AI microservices. This document covers the core technologies, design choices, and architectural specs.
+The DevCollab backend is built with a robust, modern Node.js stack designed for real-time collaboration, horizontal scalability, and seamless integration with multiple AI microservices. This document covers the core technologies, design choices, and architectural specs.
 
 ---
 

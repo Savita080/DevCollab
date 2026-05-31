@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import Modal from '../ui/Modal';
 import { PriorityChip } from '../ui/Badge';
 import { TASK_STATUS_COLORS } from '../../store/tasks';
+import { taskAssignees } from '../../lib/utils';
 import s from '../../styles/modules/KanbanCalendar.module.css';
 
 // Helper to get days in a month grid
@@ -60,9 +61,12 @@ function DayTasksModal({ date, tasks, onClose, onTaskClick }) {
                 >
                   {t.status}
                 </span>
-                {t.assignee && (
-                  <span style={{ color: 'var(--text-2)' }}>• {t.assignee.name || 'Assigned'}</span>
-                )}
+                {(() => {
+                  const names = taskAssignees(t).map(a => a.name).filter(Boolean);
+                  if (!names.length) return null;
+                  const label = names.length === 1 ? names[0] : `${names.length} assignees`;
+                  return <span style={{ color: 'var(--text-2)' }}>• {label}</span>;
+                })()}
               </div>
             </div>
           ))

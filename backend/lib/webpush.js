@@ -20,7 +20,7 @@ export async function sendPushToUser(user, payload) {
     if (!user?.pushSubscriptions?.length) return;
 
     const data = JSON.stringify({
-        title: payload.title || 'RealCollab',
+        title: payload.title || 'DevCollab',
         body: payload.body || '',
         icon: '/favicon.svg',
         badge: '/favicon.svg',

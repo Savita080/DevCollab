@@ -166,6 +166,14 @@ export const chat = {
   sendWorkspace:     (wid, d)      => api.post(`/workspaces/${wid}/chat`, d),
   reactWorkspace:    (wid, mid, emoji) =>
     api.post(`/workspaces/${wid}/chat/${mid}/react`, { emoji }),
+  editWorkspace:     (wid, mid, content) =>
+    api.patch(`/workspaces/${wid}/chat/${mid}`, { content }),
+  deleteWorkspace:   (wid, mid) =>
+    api.delete(`/workspaces/${wid}/chat/${mid}`),
+  markWorkspaceRead: (wid) =>
+    api.post(`/workspaces/${wid}/chat/read`),
+  togglePinWorkspace:(wid, mid) =>
+    api.post(`/workspaces/${wid}/chat/${mid}/pin`),
 };
 
 // ── Activity ──────────────────────────────────────────
@@ -194,6 +202,11 @@ export const ai = {
   standup:   (wid, pid)     => api.post(`/ai/standup`,           { projectId: pid }),
   plan:      (wid, pid, d)  => api.post(`/ai/generate-tasks`,    { projectId: pid, ...d }),
   review:    d              => api.post('/ai/review-code', d),
+};
+
+// ── Uploads (Cloudinary signed direct upload) ────────────────────────
+export const uploads = {
+  signature: () => api.get('/uploads/signature'),
 };
 
 // ── Subscriptions (Razorpay) — per-user, no workspace context ─────────

@@ -113,5 +113,5 @@ Limits are enforced in `middleware/planLimits.js`. The middleware resolves the w
 
 ```bash
 curl http://localhost:3000
-# { "message": "RealCollab Backend Is running" }
+# { "message": "DevCollab Backend Is running" }
 ```

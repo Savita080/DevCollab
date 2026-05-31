@@ -13,8 +13,15 @@ const projectMessageSchema = new mongoose.Schema({
     },
     content: {
         type: String,
-        required: true
+        default: '',
     },
+    // Uploaded image attachments (Cloudinary URLs). A message may be image-only
+    // (empty content) or carry both text and images.
+    attachments: [{
+        url: { type: String, required: true },
+        width: Number,
+        height: Number,
+    }],
     replyTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ProjectMessage',
