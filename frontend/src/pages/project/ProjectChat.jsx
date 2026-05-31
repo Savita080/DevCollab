@@ -26,7 +26,7 @@ import MessageBubble from '../../components/chat/MessageBubble';
 
 
 export default function ProjectChat() {
-  const { workspaceId, projectId, project } = useOutletContext();
+  const { workspaceId, projectId, project, projectMembers } = useOutletContext();
   const { user } = useAuth();
   const { toast } = useUI();
   const clearUnread = useChat(s => s.clear);
@@ -34,7 +34,10 @@ export default function ProjectChat() {
   // Keyed by canonical _id, not the URL token (which may be a slug).
   const online = useScopedPresence(project?._id ? `chat:${project._id}` : null);
 
-  const [members, setMembers] = useState([]);
+  // Seed members from the layout (it already fetched them) so we don't re-request
+  // the same endpoint on every project switch. Members are only used for @mention
+  // autocomplete — messages render fine without them.
+  const [members, setMembers] = useState(projectMembers || []);
   const [messages, setMessages] = useState([]);
   const [reads, setReads] = useState([]); // [{ user: {_id,name,avatar}, lastReadAt }]
   const [input, setInput] = useState('');
@@ -65,12 +68,20 @@ export default function ProjectChat() {
       .catch(() => toast('Failed to load chat', 'error'))
       .finally(() => setLoading(false));
 
-    // Project chat @mentions are scoped to project members only — workspace
-    // members who don't belong to the project shouldn't be tag-able from here.
-    projectsApi.members(workspaceId, projectId)
-      .then(({ data }) => setMembers(data.members ?? []))
-      .catch(() => setMembers([]));
+    // Members come from the layout via context (already fetched). Only fetch
+    // here as a fallback if the context list is empty — avoids a duplicate
+    // round-trip on every project switch.
+    if (!projectMembers || projectMembers.length === 0) {
+      projectsApi.members(workspaceId, projectId)
+        .then(({ data }) => setMembers(data.members ?? []))
+        .catch(() => setMembers([]));
+    }
   }, [workspaceId, projectId]);
+
+  // Keep members in sync if the layout's list arrives/changes after mount.
+  useEffect(() => {
+    if (projectMembers && projectMembers.length) setMembers(projectMembers);
+  }, [projectMembers]);
 
   // Realtime new messages. Socket events use the project's canonical _id, but
   // projectId from useParams may be a slug — compare against project._id.

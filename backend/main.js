@@ -66,6 +66,30 @@ setIo(io);
 // out" error that occurs when a request arrives before the connection is ready.
 await connectDB();
 
+// Explicitly build indexes for the hot read paths so they're guaranteed to
+// exist on Atlas (rather than relying on best-effort background autoIndex), and
+// any build failure surfaces in the logs instead of silently falling back to a
+// collection scan. Non-fatal — the server still starts if this hiccups.
+try {
+    const [ProjectMessage, WorkspaceMessage, Task, ChatRead, WorkspaceChatRead] = await Promise.all([
+        import('./models/projectMessage.js').then(m => m.default),
+        import('./models/workspaceMessage.js').then(m => m.default),
+        import('./models/task.js').then(m => m.default),
+        import('./models/chatRead.js').then(m => m.default),
+        import('./models/workspaceChatRead.js').then(m => m.default),
+    ]);
+    await Promise.all([
+        ProjectMessage.syncIndexes(),
+        WorkspaceMessage.syncIndexes(),
+        Task.syncIndexes(),
+        ChatRead.syncIndexes(),
+        WorkspaceChatRead.syncIndexes(),
+    ]);
+    console.log("Indexes synced for chat/task hot paths");
+} catch (err) {
+    console.error("Index sync failed (queries may be slow until built):", err.message);
+}
+
 // Activate the WebSockets!
 setupKanbanSockets(io);
 setupWhiteboardSockets(io);

@@ -62,8 +62,12 @@ const taskSchema = new mongoose.Schema({
         height: Number
     }]
 }, {
-    timestamps: true 
+    timestamps: true
 });
+
+// Board loads do Task.find({ project }).sort('position'); create does
+// findOne({ project, status }).sort('-position'). This compound index serves both.
+taskSchema.index({ project: 1, status: 1, position: 1 });
 
 const Task = mongoose.model('Task', taskSchema);
 export default Task;
