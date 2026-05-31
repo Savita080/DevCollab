@@ -31,9 +31,14 @@ cp .env.example .env
 
 # 3. Start development server
 npm run dev
+
+# Run the test suite (Vitest — auth, RBAC, IDOR)
+npm test
 ```
 
 Server starts at `http://localhost:3000`
+
+> **Entry points:** `app.js` builds the Express app (routes + middleware) and is what the tests import; `main.js` bootstraps the real server (DB connect, Socket.IO, index sync, startup).
 
 ## Environment Variables
 
@@ -47,14 +52,27 @@ Copy `.env.example` to `.env` and fill in:
 | `JWT_REFRESH_SECRET` | Yes | Secret for refresh tokens |
 | `FRONTEND_URL` | Yes | Frontend URL for CORS + invite links |
 | `REDIS_URL` | No | Redis connection string (presence + whiteboard cache) |
-| `AI_SERVICE_URL` | No | Python AI service URL (default: http://localhost:8000) |
 | `GOOGLE_CLIENT_ID` | No | Google OAuth client ID |
 | `BREVO_API_KEY` | No | Brevo API key for invite emails |
 | `BREVO_SENDER_EMAIL` | No | Verified sender email on Brevo |
 | `RAZORPAY_KEY_ID` | No | Razorpay key ID (test keys work without KYC) |
 | `RAZORPAY_KEY_SECRET` | No | Razorpay key secret |
+| `CLOUDINARY_CLOUD_NAME` | No | Cloudinary cloud name (chat + task image uploads) |
+| `CLOUDINARY_API_KEY` | No | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | No | Cloudinary API secret (signs direct uploads) |
+| `VAPID_PUBLIC_KEY` | No | Web-push VAPID public key (browser notifications) |
+| `VAPID_PRIVATE_KEY` | No | Web-push VAPID private key |
+| `VAPID_EMAIL` | No | Contact email for VAPID (`mailto:`) |
+| `PY_REVIEWER_URL` | No | Python code-review service (default: http://localhost:8000) |
+| `JS_REVIEWER_URL` | No | JS/TS code-review service (default: http://localhost:8001) |
+| `COMB_REVIEWER_URL` | No | Java/C++/Go review service (default: http://localhost:8002) |
+| `AI_STANDUP_URL` | No | Standup report service |
+| `AI_SUMMARY_URL` | No | Project summary service |
+| `AI_BLOCKER_URL` | No | Bottleneck detection service |
+| `AI_BREAKDOWN_URL` | No | Task breakdown service |
 
 > **Minimum to run:** `MONGO_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `FRONTEND_URL`
+> Image uploads, web-push, and each AI feature stay disabled (graceful) until their vars are set.
 
 ## API Overview
 
@@ -72,9 +90,10 @@ All protected routes require: `Authorization: Bearer <token>`
 | Snippets | `/workspaces/:wId/projects/:pId/snippets` | CRUD + tags |
 | Wiki | `/workspaces/:wId/projects/:pId/wiki` | CRUD + version history |
 | Whiteboards | `/workspaces/:wId/projects/:pId/whiteboards` | CRUD + real-time drawing |
-| Chat | `/workspaces/:wId/projects/:pId/chat` | Project + workspace chat |
-| Notifications | `/notifications` | unread, mark-read |
-| Activity | `/workspaces/:wId/projects/:pId/activity` | Feed (latest 50) |
+| Chat | `/workspaces/:wId/projects/:pId/chat` + `/workspaces/:wId/chat` | Project + workspace chat: send, edit, delete, pin, react, search, read receipts, image attachments |
+| Notifications | `/notifications` | unread, mark-read, web-push subscribe |
+| Activity | `/workspaces/:wId/projects/:pId/activity` | Feed (latest 100) |
+| Uploads | `/uploads` | `GET /signature` — signed direct Cloudinary image upload |
 | AI | `/ai` | review-code, standup, summarize, generate-tasks, bottleneck |
 | Subscriptions | `/subscriptions` | subscribe, verify, cancel, status — **per-user, no workspace context** |
 
@@ -82,13 +101,16 @@ Full API reference: [`../docs/api/backend_api.md`](../docs/api/backend_api.md)
 
 ## Real-Time (Socket.IO)
 
-Socket.IO runs on the same port as HTTP. Key events:
+Socket.IO runs on the same port as HTTP. **The connection is authenticated** — the
+client sends its JWT in the handshake (`socket.handshake.auth.token`); the server
+verifies it and sets `socket.userId`. Identity is never taken from client payloads.
 
 | Event | Description |
 |---|---|
-| `user_online` | Register presence (send `userId` on login) |
-| `join_project` | Join a project room for live kanban + chat |
-| `task_move` | Drag a kanban card |
+| `user_online` | Announce display name/avatar for presence (userId comes from the verified JWT, not the payload) |
+| `join_project` / `leave_project` | Join/leave a project room for live kanban + chat |
+| `presence:join` / `presence:leave` / `presence:request` | Page-scoped presence (e.g. `chat:<id>`, `wb:<id>`, `ws:<id>`) → `presence:scope_update` |
+| `task_move` | Drag a kanban card (authorized server-side) |
 | `join_whiteboard` | Join a whiteboard session |
 | `whiteboard_draw` | Broadcast drawing strokes |
 

@@ -178,7 +178,7 @@ Three independent services. Each runs on its own port. Each scales on its own.
        │   MongoDB    │  │    Redis     │  │   AI Services (4)     │
        │   Atlas      │  │   ioredis    │  │   FastAPI · LangChain │
        │              │  │  (optional)  │  │   Groq LLM            │
-       │ 13 models    │  │ presence +   │  │ • Code Reviewer :8000 │
+       │ 16 models    │  │ presence +   │  │ • Code Reviewer :8000 │
        │              │  │ whiteboard   │  │ • Standup Report      │
        │              │  │ cache        │  │ • Bottleneck Detector │
        │              │  │              │  │ • Progress Summary    │
@@ -341,10 +341,12 @@ DevCollab/
 ├── 🟢 backend/                    Node.js · Express 5 · Socket.IO
 │   ├── controllers/              Domain handlers (auth, tasks, wiki, …)
 │   ├── middleware/               auth · rbac · planLimits
-│   ├── models/                   13 Mongoose schemas
+│   ├── models/                   16 Mongoose schemas
 │   ├── routes/                   Express routers (one per domain)
 │   ├── sockets/                  kanbanSocket + whiteboardSocket
-│   ├── main.js                   Entry point
+│   ├── tests/                    Vitest API tests (auth · RBAC · IDOR)
+│   ├── app.js                    Express app (routes + middleware)
+│   ├── main.js                   Server bootstrap (DB · Socket.IO · startup)
 │   └── README.md                 Setup & env reference
 │
 ├── 🔵 frontend/                   React 19 · Vite SPA
@@ -483,8 +485,9 @@ React SPA · Kanban UI<br />Whiteboard · Wiki Editor
 |---|---|
 | 🟢 [**Backend Setup**](backend/README.md) | Env vars · scripts · plan limits · verify steps |
 | 📡 [**Full API Reference**](docs/api/backend_api.md) | Every REST endpoint · every Socket.IO event |
-| 🟣 [**AI Services Overview**](aiServices/ai_services_documentation.md) | Architecture of all 4 microservices |
-| 🤖 [**AI Technical Report**](aiServices/ai_services_technical_report.md) | Agent design · model choices · benchmarks |
+| 🏗️ [**Backend Architecture**](docs/architecture/backend.md) | Stack · auth/RBAC · sockets · AI orchestration |
+| 🟣 [**AI Service Docs**](docs/architecture/) | Per-service architecture (reviewers, standup, blocker, summary, taskbreaker) |
+| 🗺️ [**Roadmap**](docs/ROADMAP.md) | Post-hackathon vision & tiered feature plan |
 
 ---
 
