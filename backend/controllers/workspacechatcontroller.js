@@ -218,14 +218,18 @@ export const searchWorkspaceMessages = async (req, res) => {
 export const getWorkspaceMessages = async (req, res) => {
     try {
         const { workspaceId } = req.params;
-        const messages = await WorkspaceMessage.find({ workspace: workspaceId })
-            .populate('sender', 'name avatar')
-            .populate(REPLY_POPULATE)
-            .sort('createdAt');
-
-        const reads = await WorkspaceChatRead.find({ workspace: workspaceId })
-            .populate('user', 'name avatar')
-            .lean();
+        const [messages, reads] = await Promise.all([
+            WorkspaceMessage.find({ workspace: workspaceId })
+                .populate('sender', 'name avatar')
+                .populate(REPLY_POPULATE)
+                .sort('-createdAt')
+                .limit(100)
+                .lean()
+                .then(msgs => msgs.reverse()),
+            WorkspaceChatRead.find({ workspace: workspaceId })
+                .populate('user', 'name avatar')
+                .lean(),
+        ]);
 
         res.status(200).json({ messages, reads });
     } catch (error) {

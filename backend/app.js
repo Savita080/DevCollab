@@ -4,6 +4,8 @@
 // the real server startup, Socket.IO, and DB connection.
 import express from 'express';
 import cors from 'cors';
+import mongoose from 'mongoose';
+import { captureError } from './lib/sentry.js';
 import authroutes from './routes/authroutes.js';
 import workspaceroutes from './routes/workspaceroutes.js';
 import projectroutes from './routes/projectroutes.js';
@@ -69,6 +71,18 @@ app.get("/", (req, res) => {
     res.json({ message: "RealCollab Backend Is running" });
 });
 
+// Health check — for Render/uptime monitors. Reports process + DB state.
+// readyState 1 = connected. Returns 200 only when the DB is usable.
+app.get("/health", (req, res) => {
+    const dbReady = mongoose.connection.readyState === 1;
+    res.status(dbReady ? 200 : 503).json({
+        status: dbReady ? 'ok' : 'degraded',
+        db: dbReady ? 'connected' : 'disconnected',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+    });
+});
+
 // JSON 404 — keeps the error shape consistent with the rest of the API.
 app.use((req, res) => {
     res.status(404).json({ message: "Not found" });
@@ -78,6 +92,10 @@ app.use((req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
     console.error("Unhandled error:", err.message);
+    // Report 5xx (real bugs) to Sentry; skip expected 4xx client errors.
+    if (!err.status || err.status >= 500) {
+        captureError(err, { path: req.originalUrl, method: req.method });
+    }
     res.status(err.status || 500).json({ error: "Internal Server Error" });
 });
 

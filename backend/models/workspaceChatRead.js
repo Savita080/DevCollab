@@ -9,6 +9,9 @@ const workspaceChatReadSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 workspaceChatReadSchema.index({ user: 1, workspace: 1 }, { unique: true });
+// getWorkspaceMessages reads WorkspaceChatRead.find({ workspace }) — needs a
+// workspace-leading index (the unique one above leads with `user`).
+workspaceChatReadSchema.index({ workspace: 1 });
 
 const WorkspaceChatRead = mongoose.model('WorkspaceChatRead', workspaceChatReadSchema);
 export default WorkspaceChatRead;

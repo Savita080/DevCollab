@@ -61,14 +61,17 @@ export const requireProjectRole = (minRole) => async (req, res, next) => {
             return res.status(400).json({ message: "Project ID is required for role checking." });
         }
 
-        const project = await Project.findById(projectId);
+        // Only the fields we actually need; no full hydration on this hot path.
+        const project = await Project.findById(projectId).select('members workspace createdBy');
         if (!project) {
             return res.status(404).json({ message: "Project not found." });
         }
 
         const member = project.members.find(m => m.user.toString() === req.userId);
 
-        // Also allow Workspace OWNERs and ADMINs to bypass project roles (super admins)
+        // Also allow Workspace OWNERs and ADMINs to bypass project roles (super admins).
+        // Downstream middleware (checkLimit) relies on req.workspace being set, so we
+        // load it here when it isn't already present.
         let isSuperAdmin = false;
         if (req.workspace && req.memberRole) {
             if (req.memberRole === 'OWNER' || req.memberRole === 'ADMIN') {

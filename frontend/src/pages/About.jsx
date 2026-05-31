@@ -22,7 +22,7 @@ const TEAM = [
     name: 'Savita',
     role: 'Frontend & UI/UX',
     desc: 'Designed and built the React SPA — Kanban UI, whiteboard, wiki editor, live chat, and all pages.',
-    email: '',
+    email: 'svtdkd@gmail.com',
     initials: 'SV',
     color: '#06b6d4',
   },

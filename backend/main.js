@@ -9,6 +9,17 @@ import './config/redis.js'; // Import Redis so it connects!
 import app, { setIo } from './app.js';
 import { setupKanbanSockets } from './sockets/kanbanSocket.js';
 import { setupWhiteboardSockets } from './sockets/whiteboardSocket.js';
+import { captureError } from './lib/sentry.js';
+
+// Last-resort safety nets: log + report crashes instead of dying silently.
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled promise rejection:', reason);
+    captureError(reason instanceof Error ? reason : new Error(String(reason)), { kind: 'unhandledRejection' });
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err);
+    captureError(err, { kind: 'uncaughtException' });
+});
 
 // Fail fast if security-critical env vars are missing — these are required for
 // auth to work at all, and a missing JWT secret silently makes tokens forgeable.
@@ -51,7 +62,33 @@ io.use((socket, next) => {
 // no-op stub until this is called).
 setIo(io);
 
-connectDB();
+// Wait for MongoDB before accepting traffic — prevents the "buffering timed
+// out" error that occurs when a request arrives before the connection is ready.
+await connectDB();
+
+// Explicitly build indexes for the hot read paths so they're guaranteed to
+// exist on Atlas (rather than relying on best-effort background autoIndex), and
+// any build failure surfaces in the logs instead of silently falling back to a
+// collection scan. Non-fatal — the server still starts if this hiccups.
+try {
+    const [ProjectMessage, WorkspaceMessage, Task, ChatRead, WorkspaceChatRead] = await Promise.all([
+        import('./models/projectMessage.js').then(m => m.default),
+        import('./models/workspaceMessage.js').then(m => m.default),
+        import('./models/task.js').then(m => m.default),
+        import('./models/chatRead.js').then(m => m.default),
+        import('./models/workspaceChatRead.js').then(m => m.default),
+    ]);
+    await Promise.all([
+        ProjectMessage.syncIndexes(),
+        WorkspaceMessage.syncIndexes(),
+        Task.syncIndexes(),
+        ChatRead.syncIndexes(),
+        WorkspaceChatRead.syncIndexes(),
+    ]);
+    console.log("Indexes synced for chat/task hot paths");
+} catch (err) {
+    console.error("Index sync failed (queries may be slow until built):", err.message);
+}
 
 // Activate the WebSockets!
 setupKanbanSockets(io);

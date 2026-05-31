@@ -17,25 +17,38 @@ export default function ProjectLayout() {
   const navigate = useNavigate();
   const wsContext = useOutletContext();
   const workspaceRole = wsContext?.role;
-  const { projectRole, projectMembers, loading, hasAccess, isContributor, isProjectViewer, canEdit } =
+  const { projectRole, projectMembers, roleLoading, resolved, hasAccess, isContributor, isProjectViewer, canEdit } =
     useProjectRole(workspaceId, projectId, workspaceRole);
-  const [project, setProject] = useState(null);
-  const [projLoading, setProjLoading] = useState(true);
   const { bindSocket, unbindSocket } = useTasks();
   const { setProject: setStoreProject, projects: projList } = useWorkspace();
 
-  // Fetch project details
+  // Seed the project optimistically from the already-loaded workspace projects
+  // list so a switch paints real data instantly (no fetch wait). The URL token
+  // may be a Mongo _id OR a slug, so match against both.
+  const seedProject = () => projList.find(p => p._id === projectId || p.slug === projectId) || null;
+  const [project, setProject] = useState(seedProject);
+  // Only show the content skeleton when we have NOTHING to render yet.
+  const [projLoading, setProjLoading] = useState(!seedProject());
+
+  // Fetch project details as background revalidation. If we already have a seed
+  // we don't flip projLoading, so the content region never blanks on switch.
   useEffect(() => {
     if (!workspaceId || !projectId) return;
-    setProjLoading(true);
+    const seed = seedProject();
+    if (seed) { setProject(seed); setProjLoading(false); }
+    else setProjLoading(true);
+
+    let cancelled = false;
     projApi.get(workspaceId, projectId)
       .then(({ data }) => {
+        if (cancelled) return;
         const p = data.project ?? data;
         setProject(p);
         setStoreProject(p);
       })
-      .catch(() => setProject(null))
-      .finally(() => setProjLoading(false));
+      .catch(() => { if (!cancelled && !seed) setProject(null); })
+      .finally(() => { if (!cancelled) setProjLoading(false); });
+    return () => { cancelled = true; };
   }, [workspaceId, projectId]);
 
   // Keep store in sync if project list loads. projectId from the URL may be
@@ -58,41 +71,14 @@ export default function ProjectLayout() {
     };
   }, [project?._id]);
 
-  if (loading || projLoading) {
-    return (
-      <div className={s.layout}>
-        <div className={s.sidebarSkeleton}>
-          <Skeleton height={32} style={{ margin: '20px 16px' }} />
-          <Skeleton height={28} count={8} style={{ margin: '4px 16px' }} />
-        </div>
-        <div className={s.right}>
-          <div className={s.topbarSkeleton} />
-          <div className={s.main}>
-            <Skeleton height={32} width="40%" style={{ marginBottom: 24 }} />
-            <Skeleton height={200} style={{ marginBottom: 16 }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!hasAccess) {
-    return (
-      <div className={s.layout}>
-        <ProjectSidebar project={project} canEdit={false} role={workspaceRole} />
-        <div className={s.right}>
-          <WorkspaceTopBar workspace={wsContext?.workspace} role={workspaceRole} />
-          <main className={s.main}>
-            <AccessRestricted
-              title="Project Access Restricted"
-              message="You're not a member of this project. Ask a workspace admin or project contributor to add you."
-              onBack={() => navigate(`/workspaces/${workspaceId}/projects`)}
-            />
-          </main>
-        </div>
-      </div>
-    );
-  }
+  // Chrome (sidebar + topbar) is ALWAYS rendered and never unmounts on a project
+  // switch — it's identical across projects in the same workspace, so blanking it
+  // is what made switches feel slow. Only the content region shows a skeleton, and
+  // only when we genuinely have nothing yet.
+  const showContentSkeleton = projLoading && !project;
+  // Show AccessRestricted only once the role fetch has RESOLVED and confirmed no
+  // access — never during the in-flight window (avoids a flash on every switch).
+  const showRestricted = resolved && !hasAccess;
 
   return (
     <div className={s.layout}>
@@ -101,19 +87,33 @@ export default function ProjectLayout() {
         <WorkspaceTopBar workspace={wsContext?.workspace} role={workspaceRole} />
         <main className={s.main}>
           <div className={s.content}>
-            <Outlet context={{
-              workspaceId,
-              projectId,
-              project,
-              workspace: wsContext?.workspace,
-              workspaceRole,
-              projectRole,
-              projectMembers,
-              isContributor,
-              isProjectViewer,
-              canEdit,
-              wsMembers: wsContext?.members,
-            }} />
+            {showRestricted ? (
+              <AccessRestricted
+                title="Project Access Restricted"
+                message="You're not a member of this project. Ask a workspace admin or project contributor to add you."
+                onBack={() => navigate(`/workspaces/${workspaceId}/projects`)}
+              />
+            ) : showContentSkeleton ? (
+              <>
+                <Skeleton height={32} width="40%" style={{ marginBottom: 24 }} />
+                <Skeleton height={200} style={{ marginBottom: 16 }} />
+              </>
+            ) : (
+              <Outlet context={{
+                workspaceId,
+                projectId,
+                project,
+                workspace: wsContext?.workspace,
+                workspaceRole,
+                projectRole,
+                projectMembers,
+                roleLoading,
+                isContributor,
+                isProjectViewer,
+                canEdit,
+                wsMembers: wsContext?.members,
+              }} />
+            )}
           </div>
         </main>
       </div>

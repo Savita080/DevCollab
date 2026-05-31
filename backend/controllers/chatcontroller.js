@@ -233,15 +233,20 @@ export const togglePinProjectMessage = async (req, res) => {
 export const getProjectMessages = async (req, res) => {
     try {
         const { projectId } = req.params;
-        const messages = await ProjectMessage.find({ project: projectId })
-            .populate('sender', 'name avatar')
-            .populate(REPLY_POPULATE)
-            .sort('createdAt'); // Oldest first (like normal chat history)
-
-        // Per-user lastReadAt for the seen-by row.
-        const reads = await ChatRead.find({ project: projectId })
-            .populate('user', 'name avatar')
-            .lean();
+        // Run both queries in parallel — they're independent.
+        // Limit to the latest 100 messages; older history can be loaded on scroll (future).
+        const [messages, reads] = await Promise.all([
+            ProjectMessage.find({ project: projectId })
+                .populate('sender', 'name avatar')
+                .populate(REPLY_POPULATE)
+                .sort('-createdAt')   // newest first so the limit keeps recent messages
+                .limit(100)
+                .lean()
+                .then(msgs => msgs.reverse()), // re-reverse for oldest-first display
+            ChatRead.find({ project: projectId })
+                .populate('user', 'name avatar')
+                .lean(),
+        ]);
 
         res.status(200).json({ messages, reads });
     } catch (error) {
