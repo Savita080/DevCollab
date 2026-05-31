@@ -45,5 +45,9 @@ const projectMessageSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+// Index on project + createdAt covers the getProjectMessages query (filter by
+// project, sort by date). Compound because we always filter AND sort together.
+projectMessageSchema.index({ project: 1, createdAt: 1 });
+
 const ProjectMessage = mongoose.model('ProjectMessage', projectMessageSchema);
 export default ProjectMessage;

@@ -58,11 +58,16 @@ export const setupKanbanSockets = (io) => {
             }
         });
 
-        // 1. JOIN ROOM: The frontend tells us which project they are looking at
+        // 1. JOIN ROOM: The frontend tells us which project they are looking at.
+        // Guard against duplicate joins — if the socket is already in this room
+        // (e.g. heartbeat re-emitting), skip the DB broadcast.
         socket.on('join_project', async (projectId) => {
+            const alreadyIn = socket.rooms.has(projectId);
             socket.join(projectId);
-            console.log(`[Socket] User ${socket.id} joined project room: ${projectId}`);
-            await broadcastPresence(io, projectId, redis);
+            if (!alreadyIn) {
+                console.log(`[Socket] User ${socket.id} joined project room: ${projectId}`);
+                await broadcastPresence(io, projectId, redis);
+            }
         });
 
         // 2. LEAVE ROOM: They clicked away to a different page

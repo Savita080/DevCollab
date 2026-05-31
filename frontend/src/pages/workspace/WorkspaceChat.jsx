@@ -143,8 +143,16 @@ export default function WorkspaceChat() {
     };
   }, [workspaceId, workspace?._id, user?.name]);
 
+  const prevLengthRef = useRef(0);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!bottomRef.current) return;
+    const isInitialLoad = prevLengthRef.current === 0 && messages.length > 1;
+    prevLengthRef.current = messages.length;
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({
+        behavior: isInitialLoad ? 'instant' : 'smooth',
+      });
+    });
   }, [messages.length]);
 
   // Mark read when open + focused.

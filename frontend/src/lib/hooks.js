@@ -36,24 +36,33 @@ export function usePresence(projectId) {
   const [online, setOnline] = useState([]);
   useEffect(() => {
     if (!projectId) return;
-    const announceAndJoin = () => {
+    // Full join — emitted once on mount and on socket reconnect.
+    const joinAndAnnounce = () => {
       const identity = getSocketIdentity();
       if (identity) socket.emit('user_online', identity);
       socket.emit('join_project', projectId);
       socket.emit('request_presence', projectId);
     };
+    // Heartbeat only re-announces identity + requests a fresh snapshot.
+    // Does NOT re-emit join_project (socket is already in the room).
+    const heartbeatTick = () => {
+      if (!socket.connected) return;
+      const identity = getSocketIdentity();
+      if (identity) socket.emit('user_online', identity);
+      socket.emit('request_presence', projectId);
+    };
     const onPresenceUpdate = (data) => {
       if (data?.projectId === projectId) setOnline(data.users || []);
     };
-    const onFocus = () => { if (socket.connected) announceAndJoin(); };
+    const onFocus = () => { if (socket.connected) heartbeatTick(); };
     socket.on('presence:update', onPresenceUpdate);
-    socket.on('connect', announceAndJoin);
+    socket.on('connect', joinAndAnnounce);
     window.addEventListener('focus', onFocus);
-    if (socket.connected) announceAndJoin();
-    const heartbeat = setInterval(() => { if (socket.connected) announceAndJoin(); }, 15000);
+    if (socket.connected) joinAndAnnounce();
+    const heartbeat = setInterval(heartbeatTick, 30000); // 30s is plenty
     return () => {
       socket.off('presence:update', onPresenceUpdate);
-      socket.off('connect', announceAndJoin);
+      socket.off('connect', joinAndAnnounce);
       window.removeEventListener('focus', onFocus);
       clearInterval(heartbeat);
     };
@@ -69,25 +78,31 @@ export function useScopedPresence(scopeKey) {
   const [online, setOnline] = useState([]);
   useEffect(() => {
     if (!scopeKey) return;
-    const announceAndJoin = () => {
+    const joinAndAnnounce = () => {
       const identity = getSocketIdentity();
       if (identity) socket.emit('user_online', identity);
       socket.emit('presence:join', scopeKey);
       socket.emit('presence:request', scopeKey);
     };
+    const heartbeatTick = () => {
+      if (!socket.connected) return;
+      const identity = getSocketIdentity();
+      if (identity) socket.emit('user_online', identity);
+      socket.emit('presence:request', scopeKey);
+    };
     const onScopeUpdate = (data) => {
       if (data?.scopeKey === scopeKey) setOnline(data.users || []);
     };
-    const onFocus = () => { if (socket.connected) announceAndJoin(); };
+    const onFocus = () => { if (socket.connected) heartbeatTick(); };
     socket.on('presence:scope_update', onScopeUpdate);
-    socket.on('connect', announceAndJoin);
+    socket.on('connect', joinAndAnnounce);
     window.addEventListener('focus', onFocus);
-    if (socket.connected) announceAndJoin();
-    const heartbeat = setInterval(() => { if (socket.connected) announceAndJoin(); }, 15000);
+    if (socket.connected) joinAndAnnounce();
+    const heartbeat = setInterval(heartbeatTick, 30000);
     return () => {
       socket.emit('presence:leave', scopeKey);
       socket.off('presence:scope_update', onScopeUpdate);
-      socket.off('connect', announceAndJoin);
+      socket.off('connect', joinAndAnnounce);
       window.removeEventListener('focus', onFocus);
       clearInterval(heartbeat);
     };

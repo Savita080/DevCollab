@@ -62,7 +62,9 @@ io.use((socket, next) => {
 // no-op stub until this is called).
 setIo(io);
 
-connectDB();
+// Wait for MongoDB before accepting traffic — prevents the "buffering timed
+// out" error that occurs when a request arrives before the connection is ready.
+await connectDB();
 
 // Activate the WebSockets!
 setupKanbanSockets(io);

@@ -44,5 +44,7 @@ const workspaceMessageSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+workspaceMessageSchema.index({ workspace: 1, createdAt: 1 });
+
 const WorkspaceMessage = mongoose.model('WorkspaceMessage', workspaceMessageSchema);
 export default WorkspaceMessage;

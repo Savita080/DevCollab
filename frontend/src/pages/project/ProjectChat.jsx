@@ -151,8 +151,21 @@ export default function ProjectChat() {
     };
   }, [projectId, project?._id, user?.name]);
 
+  // Scroll to bottom when messages change. On initial load (loading just became
+  // false) use 'instant' so we jump straight to the bottom without animating
+  // through the entire history. For new incoming messages use 'smooth'.
+  const prevLengthRef = useRef(0);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!bottomRef.current) return;
+    const isInitialLoad = prevLengthRef.current === 0 && messages.length > 1;
+    prevLengthRef.current = messages.length;
+    // Wait one animation frame so the browser has painted all message elements
+    // before we measure their positions and scroll.
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({
+        behavior: isInitialLoad ? 'instant' : 'smooth',
+      });
+    });
   }, [messages.length]);
 
   // Mark chat as read when this page is open + tab focused. Debounced so a
