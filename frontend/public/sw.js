@@ -4,8 +4,8 @@ self.addEventListener('push', event => {
     event.waitUntil(
         self.registration.showNotification(title, {
             body,
-            icon: icon || '/favicon.svg',
-            badge: badge || '/favicon.svg',
+            icon: icon || '/favicon.png',
+            badge: badge || '/favicon.png',
             data,
             vibrate: [100, 50, 100],
         })

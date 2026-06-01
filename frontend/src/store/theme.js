@@ -77,6 +77,12 @@ function writeStoredTheme(id) {
 function applyDom(id) {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', id);
+  
+  // Update favicon to match the theme
+  const link = document.querySelector("link[rel~='icon']");
+  if (link) {
+    link.href = `/favicon-${id}.png`;
+  }
 }
 
 export const useTheme = create((set, get) => ({
