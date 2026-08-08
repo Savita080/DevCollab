@@ -13,6 +13,8 @@ api.interceptors.request.use(cfg => {
 });
 
 // 401 handler — silently refresh access token, retry original request once
+let refreshPromise = null;
+
 api.interceptors.response.use(
   r => r,
   async err => {
@@ -22,10 +24,12 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('rc_refresh_token');
       if (refreshToken) {
         try {
-          const { data } = await axios.post(
-            (import.meta.env.VITE_API_URL || '') + '/api/auth/refresh',
-            { refreshToken }
-          );
+          if (!refreshPromise) {
+            refreshPromise = axios
+              .post((import.meta.env.VITE_API_URL || '') + '/api/auth/refresh', { refreshToken })
+              .finally(() => { refreshPromise = null; });
+          }
+          const { data } = await refreshPromise;
           localStorage.setItem('rc_token', data.token);
           original.headers.Authorization = `Bearer ${data.token}`;
           return api(original);
@@ -217,6 +221,8 @@ export const ai = {
 export const uploads = {
   signature: (filename, contentType) =>
     api.get('/uploads/signature', { params: { filename, contentType } }),
+  access: (url, { filename, disposition } = {}) =>
+    api.get('/uploads/access', { params: { url, filename, disposition } }),
 };
 
 // ── Subscriptions (Razorpay) — per-user, no workspace context ─────────
