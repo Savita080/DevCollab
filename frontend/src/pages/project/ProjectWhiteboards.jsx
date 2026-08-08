@@ -19,7 +19,7 @@ import s from '../../styles/modules/Whiteboards.module.css';
 export default function ProjectWhiteboards() {
   const { workspaceId, projectId, project, canEdit } = useOutletContext();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const themeKind = useTheme(s => s.getActive().kind);
   // Scoped presence: only people viewing the Whiteboards section right now.
   const online = useScopedPresence(project?._id ? `wb:${project._id}` : null);
@@ -232,7 +232,7 @@ export default function ProjectWhiteboards() {
   };
 
   const handleDelete = async (wb) => {
-    if (!confirm(`Delete "${wb.name}"?`)) return;
+    if (!(await confirm(`Delete "${wb.name}"?`))) return;
     try {
       await wbApi.delete(workspaceId, projectId, wb._id);
       const remaining = whiteboards.filter(w => w._id !== wb._id);

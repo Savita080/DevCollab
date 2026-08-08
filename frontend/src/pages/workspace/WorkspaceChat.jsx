@@ -3,27 +3,32 @@
 // previews, scoped presence. Reuses MessageBubble so behaviour stays identical.
 import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Send, Pin, Search, X, ImagePlus } from 'lucide-react';
+import { Send, X, Paperclip, File as FileIcon } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
 import { chat as chatApi, workspaces as wsApi } from '../../lib/api';
 import { useScopedPresence } from '../../lib/hooks';
 import { Avatar } from '../../components/ui/Badge';
+import ChatHeader from '../../components/chat/ChatHeader';
+import ChatPinned from '../../components/chat/ChatPinned';
 import MessageBubble from '../../components/chat/MessageBubble';
 import MentionInput from '../../components/ui/MentionInput';
 import EmojiPickerButton from '../../components/ui/EmojiPickerButton';
 import { ReplyPreview } from '../../components/ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
-import { fmtRelative } from '../../lib/utils';
 import socket, { joinWorkspace, leaveWorkspace } from '../../lib/socket';
-import { uploadImage, isImage } from '../../lib/upload';
+import { uploadImage, uploadFile, isImage, MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES } from '../../lib/upload';
 import ImageLightbox from '../../components/ui/ImageLightbox';
 import s from '../../styles/modules/Chat.module.css';
+
+// Old records (pre-R2 migration) have no `kind` field but are always images —
+// fall back to the presence of width/height to tell them apart from files.
+const isImageAttachment = (att) => att.kind === 'image' || (!att.kind && (att.width || att.height));
 
 export default function WorkspaceChat() {
   const { workspaceId, workspace } = useOutletContext();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const online = useScopedPresence(workspace?._id ? `ws:${workspace._id}` : null);
 
   const [members, setMembers] = useState([]);
@@ -40,11 +45,13 @@ export default function WorkspaceChat() {
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingEmitRef = useRef(null);
   const bottomRef = useRef(null);
   const messageRefs = useRef({});
+  const dragCounterRef = useRef(0);
 
   const myId = user?.id || user?._id;
 
@@ -164,19 +171,36 @@ export default function WorkspaceChat() {
   }, [workspaceId, loading, messages.length]);
 
   const handleFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter(isImage);
+    const files = Array.from(fileList || []);
     if (files.length === 0) return;
     setUploading(true);
     try {
       for (const file of files.slice(0, 6)) {
-        const att = await uploadImage(file);
-        setAttachments(prev => [...prev, att].slice(0, 6));
+        if (isImage(file)) {
+          if (file.size > MAX_FILE_BYTES) { toast(`${file.name}: image is too large (max 10MB)`, 'error'); continue; }
+          const att = await uploadImage(file);
+          setAttachments(prev => [...prev, { ...att, kind: 'image' }].slice(0, 6));
+        } else {
+          if (file.size > MAX_ATTACHMENT_BYTES) { toast(`${file.name}: file is too large (max 50MB)`, 'error'); continue; }
+          const att = await uploadFile(file);
+          setAttachments(prev => [...prev, { ...att, kind: 'file' }].slice(0, 6));
+        }
       }
     } catch (err) {
-      toast(err.message || 'Image upload failed', 'error');
+      toast(err.message || 'Upload failed', 'error');
     } finally {
       setUploading(false);
     }
+  };
+
+  const onDragEnter = (e) => { e.preventDefault(); dragCounterRef.current++; setDragActive(true); };
+  const onDragLeave = (e) => { e.preventDefault(); dragCounterRef.current--; if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setDragActive(false); } };
+  const onDragOver = (e) => e.preventDefault();
+  const onDrop = (e) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setDragActive(false);
+    handleFiles(e.dataTransfer.files);
   };
 
   const send = async (e) => {
@@ -282,76 +306,29 @@ export default function WorkspaceChat() {
     catch { setMessages(prev => prev.map(m => m._id === id ? { ...m, pinned: wasPinned } : m)); toast('Failed to pin', 'error'); }
   };
   const handleDelete = async (msgId) => {
-    if (!confirm('Delete this message?')) return;
+    if (!(await confirm('Delete this message?'))) return;
     const original = messages.find(m => m._id === msgId);
     setMessages(prev => prev.map(m => m._id === msgId ? { ...m, deletedAt: new Date().toISOString(), content: '' } : m));
     try { await chatApi.deleteWorkspace(workspaceId, msgId); }
     catch { if (original) setMessages(prev => prev.map(m => m._id === msgId ? original : m)); toast('Failed to delete', 'error'); }
   };
 
-  const pinned = messages.filter(m => m.pinned && !m.deletedAt);
-
   return (
-    <div className={s.page}>
-      <div className={s.header}>
-        <div>
-          <h1 className={s.title}>{workspace?.name || 'Workspace'} Chat</h1>
-          <p className={s.subtitle}>
-            {online.length > 0 ? `${online.length} online` : `${members.length} member${members.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
-          <div style={{ position: 'relative' }}>
-            <button type="button" onClick={() => setSearchOpen(o => !o)} title="Search messages"
-              style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center' }}>
-              <Search size={14} />
-            </button>
-            {searchOpen && (
-              <div style={{ position: 'absolute', top: '110%', right: 0, width: 320, background: 'var(--bg-dropdown, var(--bg-card, #fff))', color: 'var(--text-1)', border: '1px solid var(--border)', borderRadius: 8, padding: 8, zIndex: 10, boxShadow: '0 6px 24px rgba(0,0,0,0.18)' }}>
-                <input autoFocus type="text" placeholder="Search messages…" value={searchQ}
-                  onChange={e => setSearchQ(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQ(''); } }}
-                  style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2, transparent)', color: 'var(--text-1)', font: 'inherit', marginBottom: 6 }} />
-                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-                  {searchQ.trim() === '' ? (
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 2px' }}>Type to search this chat</div>
-                  ) : (() => {
-                    const q = searchQ.toLowerCase();
-                    const hits = messages.filter(m => !m.deletedAt && (m.content || '').toLowerCase().includes(q)).slice(-30).reverse();
-                    if (hits.length === 0) return <div style={{ fontSize: 11, color: 'var(--text-3)', padding: '4px 2px' }}>No matches</div>;
-                    return hits.map(h => (
-                      <button key={h._id} onClick={() => { setSearchOpen(false); setSearchQ(''); jumpToMessage(h._id); }}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '6px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{h.sender?.name || 'Unknown'} · {fmtRelative(h.createdAt)}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.content}</div>
-                      </button>
-                    ));
-                  })()}
-                </div>
-              </div>
-            )}
-          </div>
-          {online.slice(0, 5).map(u => (
-            <Avatar key={u._id || u.userId} name={u.name} src={u.avatar} online size={26} />
-          ))}
-          <span className={s.livePill}>● LIVE</span>
-        </div>
-      </div>
+    <div className={s.page} onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={onDragOver} onDrop={onDrop}>
+      {dragActive && <div className={s.dropOverlay}>Drop to attach</div>}
+      <ChatHeader
+        title={`${workspace?.name || 'Workspace'} Chat`}
+        subtitle={online.length > 0 ? `${online.length} online` : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+        online={online}
+        messages={messages}
+        searchQ={searchQ}
+        setSearchQ={setSearchQ}
+        searchOpen={searchOpen}
+        setSearchOpen={setSearchOpen}
+        jumpToMessage={jumpToMessage}
+      />
 
-      {pinned.length > 0 && (
-        <div style={{ borderBottom: '1px solid var(--border)', padding: '6px 12px', background: 'var(--bg-2, rgba(0,0,0,0.04))', display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-            <Pin size={11} /> Pinned ({pinned.length})
-          </div>
-          {pinned.slice(0, 3).map(p => (
-            <button key={p._id} onClick={() => jumpToMessage(p._id)}
-              style={{ background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', color: 'var(--text-2)', fontSize: 12, padding: '2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="Jump to message">
-              <strong style={{ marginRight: 6 }}>{p.sender?.name || 'Unknown'}:</strong>
-              {p.content || '📷 Photo'}
-            </button>
-          ))}
-        </div>
-      )}
+      <ChatPinned messages={messages} jumpToMessage={jumpToMessage} />
 
       <div className={s.messages}>
         {loading && <p className={s.empty}>Loading messages…</p>}
@@ -391,7 +368,7 @@ export default function WorkspaceChat() {
           });
           if (seers.length === 0) return null;
           return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, padding: '0 8px 4px', fontSize: 10, color: 'var(--text-3)' }}>
+            <div className={s.seenRow}>
               <span>Seen</span>
               {seers.slice(0, 4).map(r => (
                 <Avatar key={r.user?._id || r.user} name={r.user?.name} src={r.user?.avatar} size={14} />
@@ -415,7 +392,14 @@ export default function WorkspaceChat() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 8px' }}>
           {attachments.map((att, idx) => (
             <div key={idx} style={{ position: 'relative' }}>
-              <img src={att.url} alt="" onClick={() => setLightboxSrc(att.url)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+              {isImageAttachment(att) ? (
+                <img src={att.url} alt="" onClick={() => setLightboxSrc(att.url)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+              ) : (
+                <div style={{ width: 56, height: 56, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 4, textAlign: 'center' }}>
+                  <FileIcon size={16} />
+                  <span style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{att.name}</span>
+                </div>
+              )}
               <button type="button" onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} title="Remove"
                 style={{ position: 'absolute', top: -6, right: -6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, color: 'var(--text-2)' }}>
                 <X size={11} />
@@ -431,11 +415,11 @@ export default function WorkspaceChat() {
       )}
 
       <form className={s.inputRow} onSubmit={send}>
-        <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+        <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }}
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
-        <button type="button" className={s.sendBtn} title="Attach image"
+        <button type="button" className={s.sendBtn} title="Attach file"
           onClick={() => fileInputRef.current?.click()} disabled={uploading || attachments.length >= 6}>
-          <ImagePlus size={14} />
+          <Paperclip size={14} />
         </button>
         <MentionInput
           className={s.mentionWrap}

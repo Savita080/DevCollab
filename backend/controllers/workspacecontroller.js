@@ -338,7 +338,8 @@ export const updateMemberRole = async (req, res) => {
             }).catch(err => console.error('[role-change notify] failed:', err.message));
         }
 
-        res.status(200).json({ message: "Role updated successfully", members: req.workspace.members });
+        const populated = await Workspace.findById(req.workspace._id).populate('members.user', 'name email avatar');
+        res.status(200).json({ message: "Role updated successfully", members: populated.members });
     } catch (error) {
         console.error("Error updating role:", error.message);
         res.status(500).json({ error: "Internal Server Error" });
@@ -446,9 +447,10 @@ export const transferOwnership = async (req, res) => {
             link: `/workspaces/${req.workspace._id}`,
         }).catch(err => console.error('[ownership notify] failed:', err.message));
 
+        const populated = await Workspace.findById(req.workspace._id).populate('members.user', 'name email avatar');
         res.status(200).json({
             message: "Ownership transferred successfully",
-            members: req.workspace.members
+            members: populated.members
         });
 
     } catch (error) {

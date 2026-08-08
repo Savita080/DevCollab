@@ -15,9 +15,13 @@ const workspaceMessageSchema = new mongoose.Schema({
         type: String,
         default: '',
     },
-    // Uploaded image attachments (Cloudinary URLs). A message may be image-only.
+    // Uploaded attachments (R2 URLs). A message may be attachment-only.
     attachments: [{
         url: { type: String, required: true },
+        kind: { type: String, enum: ['image', 'file'], default: 'image' },
+        name: { type: String, default: '' },
+        size: Number,
+        mimeType: String,
         width: Number,
         height: Number,
     }],

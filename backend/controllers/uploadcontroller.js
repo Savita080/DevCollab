@@ -1,13 +1,14 @@
-import { signUpload, uploadsEnabled } from '../lib/storage.js';
+import { signUpload, uploadsEnabled } from '../lib/objectStorage.js';
 
-// Returns the params a logged-in client needs to upload one image directly to
-// Cloudinary. Auth is enforced by protectRoute on the route.
+// Returns a presigned R2 PUT URL + the public URL the client should store
+// once the upload completes. Auth is enforced by protectRoute on the route.
 export const getUploadSignature = async (req, res) => {
     try {
         if (!uploadsEnabled()) {
-            return res.status(503).json({ message: "Image uploads are not configured on the server." });
+            return res.status(503).json({ message: "File uploads are not configured on the server." });
         }
-        const sig = signUpload({ folder: 'realcollab' });
+        const { filename, contentType } = req.query;
+        const sig = await signUpload({ filename, contentType });
         res.status(200).json(sig);
     } catch (error) {
         console.error("Error signing upload:", error.message);

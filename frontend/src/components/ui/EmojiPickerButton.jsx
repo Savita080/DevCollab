@@ -48,7 +48,6 @@ export default function EmojiPickerButton({ onSelect, title = 'Add emoji', child
 
   const handleSelect = (emoji) => {
     onSelect?.(emoji.native);
-    setOpen(false);
   };
 
   return (

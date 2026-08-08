@@ -23,7 +23,7 @@ export default function WorkspaceOverview() {
   const { workspaceId, workspace, role, members, isAdmin, canCreate } = useOutletContext();
   const { user } = useAuth();
   const { toast } = useUI();
-  const { projects, refreshProjects, createProject } = useWorkspace();
+  const { projects, projectsWorkspaceId, refreshProjects, createProject } = useWorkspace();
   const navigate = useNavigate();
   const online = useScopedPresence(workspace?._id ? `ws:${workspace._id}` : null);
 
@@ -40,8 +40,14 @@ export default function WorkspaceOverview() {
     refreshProjects();
   }, [workspaceId]);
 
-  // Aggregate recent activity from up to 3 projects
+  // Aggregate recent activity from up to 3 projects. Guarded on
+  // projectsWorkspaceId matching the workspace actually in view — `projects`
+  // can still hold the *previous* workspace's list for one render after
+  // navigating (child effects run before the parent's setWorkspace call),
+  // and without this check we'd fire activity requests for the wrong
+  // workspace's projects (403s, or leaking data across workspaces).
   useEffect(() => {
+    if (!workspace?._id || projectsWorkspaceId !== workspace._id) { setLoading(false); return; }
     if (!projects.length) { setLoading(false); return; }
     setLoading(true);
     const slice = projects.slice(0, 4);
@@ -56,7 +62,7 @@ export default function WorkspaceOverview() {
       setRecentActivity(merged.slice(0, 8));
       setLoading(false);
     });
-  }, [projects.length, workspaceId]);
+  }, [projects.length, projectsWorkspaceId, workspace?._id, workspaceId]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

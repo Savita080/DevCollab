@@ -1,5 +1,6 @@
 // pages/workspace/WorkspaceProjects.jsx — list of projects in workspace
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Trash2, Edit3, Users as UsersIcon, Lock } from 'lucide-react';
 import { useWorkspace } from '../../store/workspace';
@@ -16,9 +17,9 @@ const PROJECT_COLORS = ['#6366f1', '#00d4ff', '#10b981', '#f59e0b', '#ec4899', '
 
 export default function WorkspaceProjects() {
   const { workspaceId, workspace, role: workspaceRole, isAdmin, canCreate, members } = useOutletContext();
-  const { projects, refreshProjects, createProject } = useWorkspace();
+  const { projects, projectsWorkspaceId, refreshProjects, createProject } = useWorkspace();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
@@ -33,11 +34,28 @@ export default function WorkspaceProjects() {
   const [renameName, setRenameName] = useState('');
   const [membersProj, setMembersProj] = useState(null);
   const [menuOpen, setMenuOpen] = useState(null);
+  const [menuPos, setMenuPos] = useState(null); // { top, right } in viewport coords
+  const menuBtnRefs = useRef({}); // projectId -> button DOM node
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => { setMenuOpen(null); setMenuPos(null); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('scroll', close, true);
+    };
+  }, [menuOpen]);
 
   useEffect(() => { refreshProjects(); }, [workspaceId]);
 
   // Per-project task counts — skip projects this user has no access to (would 403).
+  // Guarded on projectsWorkspaceId matching the workspace in view — `projects`
+  // can briefly hold the previous workspace's list right after navigating
+  // (child effects run before the parent's setWorkspace call resolves).
   useEffect(() => {
+    if (!workspace?._id || projectsWorkspaceId !== workspace._id) return;
     projects.forEach(async (p) => {
       if (p.hasAccess === false) {
         setStats(prev => ({ ...prev, [p._id]: { total: 0, done: 0, pct: 0 } }));
@@ -53,7 +71,7 @@ export default function WorkspaceProjects() {
         setStats(prev => ({ ...prev, [p._id]: { total: 0, done: 0, pct: 0 } }));
       }
     });
-  }, [projects.length, workspaceId]);
+  }, [projects.length, projectsWorkspaceId, workspace?._id, workspaceId]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -93,7 +111,7 @@ export default function WorkspaceProjects() {
   };
 
   const handleDelete = async (p) => {
-    if (!confirm(`Delete project "${p.name}"? This will remove all its tasks, wiki pages, and snippets.`)) return;
+    if (!(await confirm(`Delete project "${p.name}"? This will remove all its tasks, wiki pages, and snippets.`))) return;
     try {
       await projectsApi.delete(workspaceId, p._id);
       toast('Project deleted', 'success');
@@ -188,26 +206,38 @@ export default function WorkspaceProjects() {
                 {showMenu && (
                   <div className={s.menuWrap}>
                     <button
+                      ref={(el) => { if (el) menuBtnRefs.current[p._id] = el; }}
                       className={s.menuBtn}
-                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === p._id ? null : p._id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (menuOpen === p._id) { setMenuOpen(null); setMenuPos(null); return; }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                        setMenuOpen(p._id);
+                      }}
                       title="Project actions"
                     >
                       <MoreHorizontal size={14} />
                     </button>
-                    {menuOpen === p._id && (
-                      <div className={s.menu} onClick={e => e.stopPropagation()}>
-                        <button onClick={() => { setMenuOpen(null); setMembersProj(p); }}>
+                    {menuOpen === p._id && menuPos && createPortal(
+                      <div
+                        className={s.menu}
+                        style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
+                        onMouseDown={e => e.stopPropagation()}
+                      >
+                        <button onClick={() => { setMenuOpen(null); setMenuPos(null); setMembersProj(p); }}>
                           <UsersIcon size={13} /> Manage Members
                         </button>
-                        <button onClick={() => { setMenuOpen(null); setRenameProj(p); setRenameName(p.name); }}>
+                        <button onClick={() => { setMenuOpen(null); setMenuPos(null); setRenameProj(p); setRenameName(p.name); }}>
                           <Edit3 size={13} /> Rename
                         </button>
                         {(isAdmin || iAmCreator) && (
-                          <button className={s.danger} onClick={() => { setMenuOpen(null); handleDelete(p); }}>
+                          <button className={s.danger} onClick={() => { setMenuOpen(null); setMenuPos(null); handleDelete(p); }}>
                             <Trash2 size={13} /> Delete
                           </button>
                         )}
-                      </div>
+                      </div>,
+                      document.body
                     )}
                   </div>
                 )}

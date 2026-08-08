@@ -312,7 +312,8 @@ export const updateProjectMemberRole = async (req, res) => {
 
         const prevRole = project.members[memberIndex].role;
         if (prevRole === role) {
-            return res.status(200).json({ message: "Role unchanged", members: project.members });
+            const unchanged = await Project.findById(projectId).populate('members.user', 'name email avatar');
+            return res.status(200).json({ message: "Role unchanged", members: unchanged.members });
         }
 
         project.members[memberIndex].role = role;
@@ -330,7 +331,8 @@ export const updateProjectMemberRole = async (req, res) => {
             metadata: { previousRole: prevRole, newRole: role, affectedUserId: userId },
         });
 
-        res.status(200).json({ message: "Role updated successfully", members: project.members });
+        const populated = await Project.findById(projectId).populate('members.user', 'name email avatar');
+        res.status(200).json({ message: "Role updated successfully", members: populated.members });
     } catch (error) {
         console.error("Error updating project member role:", error.message);
         res.status(500).json({ error: "Internal Server Error" });

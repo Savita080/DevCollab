@@ -17,7 +17,7 @@ const WS_ROLE_COLORS = { OWNER: 'var(--amber)', ADMIN: 'var(--indigo)', MEMBER: 
 export default function ProjectMembers() {
   const { workspaceId, projectId, project, isContributor, canEdit, workspaceRole } = useOutletContext();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
 
   const [projMembers, setProjMembers] = useState([]);
   const [wsMembers, setWsMembers] = useState([]);
@@ -75,7 +75,7 @@ export default function ProjectMembers() {
   };
 
   const handleRemove = async (userId, name) => {
-    if (!confirm(`Remove ${name} from this project?`)) return;
+    if (!(await confirm(`Remove ${name} from this project?`))) return;
     setBusy(b => ({ ...b, [userId]: 'removing' }));
     try {
       await projApi.removeMember(workspaceId, projectId, userId);

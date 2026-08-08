@@ -50,6 +50,17 @@ export function fmtRelative(dateString) {
   return fmtDate(dateString);
 }
 
+// Human-readable file size (e.g. "1.2 MB")
+export function fmtBytes(bytes) {
+  if (bytes == null || isNaN(bytes)) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let val = bytes / 1024;
+  let i = 0;
+  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
+  return `${val.toFixed(val < 10 ? 1 : 0)} ${units[i]}`;
+}
+
 // Status to color mapping for Kanban/Dashboard
 export const statusColor = {
   "To Do":       "#6366f1",

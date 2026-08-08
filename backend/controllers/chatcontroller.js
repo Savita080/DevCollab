@@ -20,12 +20,20 @@ export const sendMessage = async (req, res) => {
             ? req.body.attachments
                 .filter(a => a && typeof a.url === 'string' && a.url.startsWith('http'))
                 .slice(0, 6)
-                .map(a => ({ url: a.url, width: a.width, height: a.height }))
+                .map(a => ({
+                    url: a.url,
+                    kind: a.kind === 'file' ? 'file' : 'image',
+                    name: a.name || '',
+                    size: a.size,
+                    mimeType: a.mimeType,
+                    width: a.width,
+                    height: a.height,
+                }))
             : [];
 
-        // A message must have text OR at least one image.
+        // A message must have text OR at least one attachment.
         if (!content?.trim() && attachments.length === 0) {
-            return res.status(400).json({ message: "Message content or an image is required" });
+            return res.status(400).json({ message: "Message content or an attachment is required" });
         }
 
         // Validate replyTo belongs to the same project — prevents cross-channel quoting.

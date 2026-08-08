@@ -7,6 +7,7 @@ import { listenServiceWorkerNav } from './lib/webpush';
 import PaywallModal from './components/PaywallModal';
 import ToastStack from './components/ui/Toast';
 import NotificationPopupStack from './components/ui/NotificationPopup';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 
 import LandingPage  from './pages/LandingPage';
 import Login        from './pages/Login';
@@ -54,6 +55,7 @@ function ProtectedRoot({ children }) {
       <PaywallModal />
       <ToastStack />
       <NotificationPopupStack />
+      <ConfirmDialog />
     </Guard>
   );
 }

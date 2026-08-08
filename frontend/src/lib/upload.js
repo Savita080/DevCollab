@@ -1,16 +1,17 @@
-// lib/upload.js — client-side image upload to Cloudinary via a backend-signed
+// lib/upload.js — client-side upload to Cloudflare R2 via a backend-signed
 // direct upload. Flow:
-//   1. resize/compress the image in the browser (cheaper + faster than uploading
-//      multi-MB originals; Cloudinary free tier doesn't auto-transform on upload)
-//   2. ask our backend for a one-time signature
-//   3. POST the file straight to Cloudinary (the file never touches our server)
-//   4. return { url, width, height }
+//   1. (images only) resize/compress in the browser — cheaper + faster than
+//      uploading multi-MB originals
+//   2. ask our backend for a one-time presigned PUT URL
+//   3. PUT the file straight to R2 (the file never touches our server)
+//   4. return { url, ... }
 import { uploads as uploadsApi } from './api';
 
 const MAX_DIM = 1600;       // longest edge, px — plenty for chat/task images
 const JPEG_QUALITY = 0.82;
 
-export const MAX_FILE_BYTES = 10 * 1024 * 1024; // reject originals > 10MB
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;       // reject images > 10MB
+export const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024; // reject other files > 50MB
 export const isImage = (file) => file && file.type.startsWith('image/');
 
 // Downscale + re-encode to a JPEG blob. GIFs are passed through untouched so
@@ -48,34 +49,49 @@ async function resizeImage(file) {
   return { blob: blob || file, width, height };
 }
 
+// PUT `blob` to a presigned R2 URL, reporting progress via onProgress(0-100).
+// `contentDisposition` must match what the backend signed the URL with.
+function putToR2(uploadUrl, blob, contentType, contentDisposition, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', contentType);
+    if (contentDisposition) xhr.setRequestHeader('Content-Disposition', contentDisposition);
+    xhr.upload.onprogress = (e) => {
+      if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error('Upload failed'));
+    xhr.send(blob);
+  });
+}
+
 // Upload one image file. Returns { url, width, height }. Throws on failure.
-export async function uploadImage(file) {
+export async function uploadImage(file, { onProgress } = {}) {
   if (!isImage(file)) throw new Error('Only image files are allowed');
   if (file.size > MAX_FILE_BYTES) throw new Error('Image is too large (max 10MB)');
 
   const resized = await resizeImage(file);
   const blob = resized.blob || resized;          // gif path returns the raw file
   const dims = resized.width ? { width: resized.width, height: resized.height } : {};
+  const contentType = blob.type || file.type;
 
-  // 1. signature from our backend
-  const { data: sig } = await uploadsApi.signature();
+  const { data: sig } = await uploadsApi.signature(file.name, contentType);
+  await putToR2(sig.uploadUrl, blob, contentType, sig.contentDisposition, onProgress);
 
-  // 2. direct upload to Cloudinary
-  const form = new FormData();
-  form.append('file', blob);
-  form.append('api_key', sig.apiKey);
-  form.append('timestamp', sig.timestamp);
-  form.append('signature', sig.signature);
-  form.append('folder', sig.folder);
+  return { url: sig.publicUrl, width: dims.width, height: dims.height };
+}
 
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
-    method: 'POST',
-    body: form,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || 'Upload failed');
-  }
-  const out = await res.json();
-  return { url: out.secure_url, width: out.width || dims.width, height: out.height || dims.height };
+// Upload one non-image file, no resize. Returns { url, name, size, mimeType }.
+export async function uploadFile(file, { onProgress } = {}) {
+  if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('File is too large (max 50MB)');
+
+  const contentType = file.type || 'application/octet-stream';
+  const { data: sig } = await uploadsApi.signature(file.name, contentType);
+  await putToR2(sig.uploadUrl, file, contentType, sig.contentDisposition, onProgress);
+
+  return { url: sig.publicUrl, name: file.name, size: file.size, mimeType: contentType };
 }

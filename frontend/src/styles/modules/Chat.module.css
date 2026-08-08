@@ -12,33 +12,75 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 56px - 48px);
   max-height: calc(100vh - 56px - 48px);
 }
 
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-soft);
+  border: 2px dashed var(--indigo);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--indigo);
+  z-index: 50;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding-bottom: 14px;
+  padding: 8px 4px 14px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0;
 }
+.headerIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
 .title {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--text-1);
 }
 .subtitle {
   margin: 0;
-  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
   color: var(--text-2);
+}
+.presenceDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+  margin-right: 5px;
+}
+.presenceDot[data-active="true"] {
+  background: var(--status-success);
 }
 .livePill {
   display: inline-flex;
@@ -76,9 +118,18 @@
   flex-direction: column;
   gap: 4px;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   max-width: 70%;
   animation: msgSlideIn 0.18s ease;
+}
+.runEnd {
+  margin-bottom: 10px;
+}
+.hasReactions {
+  margin-bottom: 14px;
+}
+.hasReactions.runEnd {
+  margin-bottom: 18px;
 }
 .mine {
   align-self: flex-end;
@@ -95,18 +146,55 @@
   color: var(--text-2);
   font-weight: 600;
 }
+.bubbleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+.mine .bubbleRow {
+  justify-content: flex-end;
+}
 .bubble {
-  background: var(--bg-card);
+  position: relative;
+  background: var(--bubble-them);
   border: 1px solid var(--border);
-  border-radius: 14px 14px 14px 4px;
-  padding: 10px 14px;
+  border-radius: var(--r-md) var(--r-md) var(--r-md) 4px;
+  padding: 6px 10px 5px;
   max-width: 100%;
   word-wrap: break-word;
+  min-width: 0;
 }
 .mine .bubble {
   background: var(--bubble-me);
   border-color: var(--focus-ring);
-  border-radius: 14px 14px 4px 14px;
+  border-radius: var(--r-md) var(--r-md) 4px var(--r-md);
+}
+/* Image-only messages (no text) — image fills the bubble edge-to-edge,
+   WhatsApp-style, instead of sitting inside the text-message padding. */
+.bubble.mediaOnly {
+  padding: 3px;
+}
+.attachmentImg {
+  display: block;
+  max-width: 260px;
+  max-height: 260px;
+  width: 100%;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  cursor: zoom-in;
+}
+.attachmentFile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  text-decoration: none;
+  color: inherit;
+  max-width: 220px;
 }
 .msgText {
   display: block;
@@ -117,20 +205,222 @@
   word-break: break-word;
 }
 .msgTime {
-  display: block;
-  margin-top: 4px;
+  float: right;
+  margin-left: 8px;
+  margin-top: 2px;
   font-size: 10px;
   color: var(--text-3);
   font-family: var(--font-mono);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.mine .msgTime {
+  color: color-mix(in srgb, var(--text-1) 60%, transparent);
+}
+.mediaOnly .msgTime {
+  padding: 0 4px 2px;
+}
+
+/* WhatsApp-style reaction pill — overlaps the bubble's bottom-right corner. */
+.reactionPill {
+  position: absolute;
+  bottom: -8px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  line-height: 1;
+}
+.reactionPillMine {
+  right: auto;
+  left: 6px;
+}
+.reactionEmoji {
+  font-size: 12px;
+}
+.reactionCount {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}
+
+/* Right-click context menu, WhatsApp-style */
+.ctxMenu {
+  position: fixed;
+  z-index: 2000;
+  width: 200px;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--r-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  padding: 6px;
+  animation: ctxMenuIn 0.1s ease;
+}
+@keyframes ctxMenuIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.ctxQuickReacts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 6px;
+}
+.ctxEmoji {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, transform 0.1s;
+}
+.ctxEmoji:hover {
+  background: var(--bg-hover);
+  transform: scale(1.15);
+}
+.ctxDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0 4px;
+}
+.ctxItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--text-1);
+  font-size: 13px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.ctxItem:hover {
+  background: var(--bg-hover);
+}
+.ctxDanger {
+  color: var(--status-danger);
+}
+.ctxDanger:hover {
+  background: color-mix(in srgb, var(--status-danger) 12%, transparent);
+}
+
+/* Hover-revealed action toolbar (reply/react/pin/edit/delete), WhatsApp/Telegram style */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.msgGroup:hover .actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.actionBtn {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.actionBtn:hover {
+  color: var(--text-1);
+  background: var(--accent-soft);
+  border-color: var(--border-hover);
+}
+.actionBtn.pinned {
+  color: var(--amber, #f59e0b);
+}
+
+.seenRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 8px 4px;
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.pinnedBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  background: var(--bg-2);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+  font: inherit;
+}
+.pinnedBar:hover {
+  background: var(--bg-hover);
+}
+.pinnedIcon {
+  color: var(--indigo);
+  flex-shrink: 0;
+}
+.pinnedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.pinnedLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--indigo);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pinnedText {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .inputRow {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 12px 4px 4px;
+  padding: 10px 8px;
   border-top: 1px solid var(--border);
+  background: var(--bg-2);
 }
 .mentionWrap {
   flex: 1;
@@ -139,8 +429,8 @@
   width: 100%;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 11px 14px;
+  border-radius: var(--r-xl);
+  padding: 11px 16px;
   font-family: var(--font-body);
   font-size: 13.5px;
   color: var(--text-1);

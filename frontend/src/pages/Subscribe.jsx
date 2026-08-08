@@ -32,7 +32,7 @@ const PRO_FEATURES = [
 
 export default function Subscribe() {
   const { user, setUser } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const navigate = useNavigate();
 
   const goBack = () => {
@@ -114,7 +114,7 @@ export default function Subscribe() {
   };
 
   const handleCancel = async () => {
-    if (!confirm('Cancel your PRO subscription? Your account will revert to the FREE plan.')) return;
+    if (!(await confirm('Cancel your PRO subscription? Your account will revert to the FREE plan.'))) return;
     setCancelLoading(true);
     try {
       await subApi.cancel();

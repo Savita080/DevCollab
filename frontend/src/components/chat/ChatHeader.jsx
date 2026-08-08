@@ -5,7 +5,8 @@ import { fmtRelative } from '../../lib/utils';
 import s from '../../styles/modules/Chat.module.css';
 
 export default function ChatHeader({
-  project,
+  title,
+  subtitle,
   online,
   messages,
   searchQ,
@@ -16,13 +17,17 @@ export default function ChatHeader({
 }) {
   return (
     <div className={s.header}>
-      <div>
-        <h1 className={s.title}>{project?.name || 'Project'} Chat</h1>
-        <p className={s.subtitle}>
-          {online.length > 0 ? `${online.length} online` : 'Project conversation'}
-        </p>
+      <div className={s.headerIdentity}>
+        <Avatar name={title} size={38} />
+        <div>
+          <h1 className={s.title}>{title}</h1>
+          <p className={s.subtitle}>
+            <span className={s.presenceDot} data-active={online.length > 0} />
+            {subtitle}
+          </p>
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+      <div className={s.headerActions}>
         <div style={{ position: 'relative' }}>
           <button
             type="button"

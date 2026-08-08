@@ -20,7 +20,7 @@ const PROJ_ROLE_COLORS = {
 };
 
 export default function ProjectMembersModal({ open, onClose, workspace, project, currentUserId, workspaceRole }) {
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const creatorId = project?.createdBy?._id || project?.createdBy;
   const isWsAdmin = workspaceRole === 'OWNER' || workspaceRole === 'ADMIN';
   const iAmCreator = !!(creatorId && currentUserId && creatorId.toString() === currentUserId.toString());
@@ -95,7 +95,7 @@ export default function ProjectMembersModal({ open, onClose, workspace, project,
   // ── Remove member ────────────────────────────────────────────────────────
   const handleRemove = async (pm) => {
     const uid = pm.user?._id;
-    if (!confirm(`Remove ${pm.user?.name} from this project?`)) return;
+    if (!(await confirm(`Remove ${pm.user?.name} from this project?`))) return;
     setRemovingId(uid);
     try {
       await projApi.removeMember(workspace._id, project._id, uid);
