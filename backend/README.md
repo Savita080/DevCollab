@@ -57,9 +57,11 @@ Copy `.env.example` to `.env` and fill in:
 | `BREVO_SENDER_EMAIL` | No | Verified sender email on Brevo |
 | `RAZORPAY_KEY_ID` | No | Razorpay key ID (test keys work without KYC) |
 | `RAZORPAY_KEY_SECRET` | No | Razorpay key secret |
-| `CLOUDINARY_CLOUD_NAME` | No | Cloudinary cloud name (chat + task image uploads) |
-| `CLOUDINARY_API_KEY` | No | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | No | Cloudinary API secret (signs direct uploads) |
+| `R2_ACCOUNT_ID` | No | Cloudflare R2 account ID (chat + task file/image uploads) |
+| `R2_ACCESS_KEY_ID` | No | R2 API token access key ID |
+| `R2_SECRET_ACCESS_KEY` | No | R2 API token secret (signs direct uploads) |
+| `R2_BUCKET_NAME` | No | R2 bucket name |
+| `R2_PUBLIC_URL` | No | R2 bucket's public base URL (r2.dev subdomain or custom domain) |
 | `VAPID_PUBLIC_KEY` | No | Web-push VAPID public key (browser notifications) |
 | `VAPID_PRIVATE_KEY` | No | Web-push VAPID private key |
 | `VAPID_EMAIL` | No | Contact email for VAPID (`mailto:`) |
@@ -93,7 +95,7 @@ All protected routes require: `Authorization: Bearer <token>`
 | Chat | `/workspaces/:wId/projects/:pId/chat` + `/workspaces/:wId/chat` | Project + workspace chat: send, edit, delete, pin, react, search, read receipts, image attachments |
 | Notifications | `/notifications` | unread, mark-read, web-push subscribe |
 | Activity | `/workspaces/:wId/projects/:pId/activity` | Feed (latest 100) |
-| Uploads | `/uploads` | `GET /signature` — signed direct Cloudinary image upload |
+| Uploads | `/uploads` | `GET /signature` — signed direct R2 file/image upload |
 | AI | `/ai` | review-code, standup, summarize, generate-tasks, bottleneck |
 | Subscriptions | `/subscriptions` | subscribe, verify, cancel, status — **per-user, no workspace context** |
 

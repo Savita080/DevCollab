@@ -57,7 +57,10 @@ const taskSchema = new mongoose.Schema({
     }],
     attachments: [{
         url: { type: String, required: true },
+        kind: { type: String, enum: ['image', 'file'], default: 'image' },
         name: { type: String, default: '' },
+        size: Number,
+        mimeType: String,
         width: Number,
         height: Number
     }]

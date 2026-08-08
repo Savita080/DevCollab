@@ -15,12 +15,16 @@ import ReactionBar from '../ui/ReactionBar';
 import { ReplyButton, QuoteChip, ReplyPreview } from '../ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
 import { PriorityChip, Avatar } from '../ui/Badge';
-import { fmtDate, fmtRelative, taskAssigneeIds, taskAssignees } from '../../lib/utils';
+import { fmtDate, fmtRelative, fmtBytes, taskAssigneeIds, taskAssignees } from '../../lib/utils';
 import MultiAssigneeSelect from './MultiAssigneeSelect';
-import { uploadImage, isImage } from '../../lib/upload';
+import { uploadImage, uploadFile, isImage, MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES } from '../../lib/upload';
 import ImageLightbox from '../ui/ImageLightbox';
-import { ImagePlus, X as XIcon } from 'lucide-react';
+import { ImagePlus, X as XIcon, File as FileIcon } from 'lucide-react';
 import s from '../../styles/modules/TaskDetail.module.css';
+
+// Old records (pre-R2 migration) have no `kind` field but are always images —
+// fall back to the presence of width/height to tell them apart from files.
+const isImageAttachment = (att) => att.kind === 'image' || (!att.kind && (att.width || att.height));
 
 export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembers, canEdit = true }) {
   const storeTasks = useTasks(state => state.tasks);
@@ -56,16 +60,23 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
 
   // Upload picked images and append to the edit form's attachment list.
   const handleAttachFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter(isImage);
+    const files = Array.from(fileList || []);
     if (files.length === 0) return;
     setUploading(true);
     try {
       for (const file of files.slice(0, 10)) {
-        const att = await uploadImage(file);
-        setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height }].slice(0, 10) }));
+        if (isImage(file)) {
+          if (file.size > MAX_FILE_BYTES) { toast(`${file.name}: image is too large (max 10MB)`, 'error'); continue; }
+          const att = await uploadImage(file);
+          setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height, kind: 'image' }].slice(0, 10) }));
+        } else {
+          if (file.size > MAX_ATTACHMENT_BYTES) { toast(`${file.name}: file is too large (max 50MB)`, 'error'); continue; }
+          const att = await uploadFile(file);
+          setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: att.name, size: att.size, mimeType: att.mimeType, kind: 'file' }].slice(0, 10) }));
+        }
       }
     } catch (err) {
-      toast(err.message || 'Image upload failed', 'error');
+      toast(err.message || 'Upload failed', 'error');
     } finally {
       setUploading(false);
     }
@@ -278,17 +289,32 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
           )}
         </div>
 
-        {/* Attachments (images) */}
+        {/* Attachments (images + files) */}
         {(() => {
-          const imgs = editing ? (form.attachments || []) : (currentTask.attachments || []);
-          if (!editing && imgs.length === 0) return null;
+          const atts = editing ? (form.attachments || []) : (currentTask.attachments || []);
+          if (!editing && atts.length === 0) return null;
           return (
             <div className={s.section}>
               <span className={s.sLabel}>Attachments</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {imgs.map((att, idx) => (
+                {atts.map((att, idx) => (
                   <div key={idx} style={{ position: 'relative', lineHeight: 0 }}>
-                    <img src={att.url} alt={att.name || 'attachment'} onClick={() => setLightboxSrc(att.url)} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+                    {isImageAttachment(att) ? (
+                      <img src={att.url} alt={att.name || 'attachment'} onClick={() => setLightboxSrc(att.url)} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+                    ) : (
+                      <a
+                        href={att.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={att.name}
+                        title={att.size != null ? fmtBytes(att.size) : undefined}
+                        style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', textDecoration: 'none', color: 'inherit' }}
+                      >
+                        <FileIcon size={20} />
+                        <span style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{att.name || 'file'}</span>
+                        {att.size != null && <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{fmtBytes(att.size)}</span>}
+                      </a>
+                    )}
                     {editing && canEdit && (
                       <button
                         type="button"
@@ -306,7 +332,6 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
                       multiple
                       style={{ display: 'none' }}
                       onChange={(e) => { handleAttachFiles(e.target.files); e.target.value = ''; }}
@@ -315,7 +340,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading || (form.attachments?.length || 0) >= 10}
-                      title="Add image"
+                      title="Add attachment"
                       style={{ width: 96, height: 96, borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11 }}
                     >
                       <ImagePlus size={18} />

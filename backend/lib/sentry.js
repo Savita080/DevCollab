@@ -1,5 +1,5 @@
 // lib/sentry.js — optional error tracking. Active only when SENTRY_DSN is set
-// (env-guarded, like redis/webpush/cloudinary). Without a DSN everything here
+// (env-guarded, like redis/webpush/objectStorage). Without a DSN everything here
 // is a harmless no-op, so local/CI runs are unaffected.
 import * as Sentry from '@sentry/node';
 

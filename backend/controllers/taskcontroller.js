@@ -14,6 +14,25 @@ function normalizeAssignees(body) {
     return [...new Set(raw.map(a => (a && a._id) ? a._id.toString() : (a ? a.toString() : null)).filter(Boolean))];
 }
 
+// Keep only well-formed { url } entries (max 10), dropping any other
+// client-supplied fields we don't recognize.
+function sanitizeAttachments(raw) {
+    return Array.isArray(raw)
+        ? raw
+            .filter(a => a && typeof a.url === 'string' && a.url.startsWith('http'))
+            .slice(0, 10)
+            .map(a => ({
+                url: a.url,
+                kind: a.kind === 'file' ? 'file' : 'image',
+                name: a.name || '',
+                size: a.size,
+                mimeType: a.mimeType,
+                width: a.width,
+                height: a.height,
+            }))
+        : [];
+}
+
 export const createTask = async (req, res) => {
     try {
         const { projectId } = req.params;
@@ -24,12 +43,7 @@ export const createTask = async (req, res) => {
         }
 
         const assignees = normalizeAssignees(req.body);
-        const attachments = Array.isArray(req.body.attachments)
-            ? req.body.attachments
-                .filter(a => a && typeof a.url === 'string' && a.url.startsWith('http'))
-                .slice(0, 10)
-                .map(a => ({ url: a.url, name: a.name || '', width: a.width, height: a.height }))
-            : [];
+        const attachments = sanitizeAttachments(req.body.attachments);
 
         const lastTask = await Task.findOne({ project: projectId, status: status || 'TODO' })
             .sort('-position')
@@ -126,6 +140,9 @@ export const updateTask = async (req, res) => {
         const updates = {};
         for (const key of TASK_UPDATABLE) {
             if (req.body[key] !== undefined) updates[key] = req.body[key];
+        }
+        if (updates.attachments !== undefined) {
+            updates.attachments = sanitizeAttachments(updates.attachments);
         }
 
         // Assignees: accept `assignees[]` or legacy `assignee`. Only touch them

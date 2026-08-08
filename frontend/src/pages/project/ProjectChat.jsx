@@ -1,7 +1,7 @@
 // pages/project/ProjectChat.jsx — project-level chat (no whiteboard, no ws chat)
 import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Send, Pencil, Trash2, Check, X, Pin, PinOff, Search, ImagePlus } from 'lucide-react';
+import { Send, Pencil, Trash2, Check, X, Pin, PinOff, Search, Paperclip, File as FileIcon } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
 import { useScopedPresence } from '../../lib/hooks';
@@ -17,12 +17,16 @@ import rs from '../../styles/modules/ReplyControls.module.css';
 import { fmtRelative } from '../../lib/utils';
 import { emitTyping } from '../../lib/socket';
 import socket from '../../lib/socket';
-import { uploadImage, isImage } from '../../lib/upload';
+import { uploadImage, uploadFile, isImage, MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES } from '../../lib/upload';
 import ImageLightbox from '../../components/ui/ImageLightbox';
 import s from '../../styles/modules/Chat.module.css';
 import ChatHeader from '../../components/chat/ChatHeader';
 import ChatPinned from '../../components/chat/ChatPinned';
 import MessageBubble from '../../components/chat/MessageBubble';
+
+// Old records (pre-R2 migration) have no `kind` field but are always images —
+// fall back to the presence of width/height to tell them apart from files.
+const isImageAttachment = (att) => att.kind === 'image' || (!att.kind && (att.width || att.height));
 
 
 export default function ProjectChat() {
@@ -194,16 +198,23 @@ export default function ProjectChat() {
 
   // Upload picked image files, appending results to the pending attachment strip.
   const handleFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter(isImage);
+    const files = Array.from(fileList || []);
     if (files.length === 0) return;
     setUploading(true);
     try {
       for (const file of files.slice(0, 6)) {
-        const att = await uploadImage(file);
-        setAttachments(prev => [...prev, att].slice(0, 6));
+        if (isImage(file)) {
+          if (file.size > MAX_FILE_BYTES) { toast(`${file.name}: image is too large (max 10MB)`, 'error'); continue; }
+          const att = await uploadImage(file);
+          setAttachments(prev => [...prev, { ...att, kind: 'image' }].slice(0, 6));
+        } else {
+          if (file.size > MAX_ATTACHMENT_BYTES) { toast(`${file.name}: file is too large (max 50MB)`, 'error'); continue; }
+          const att = await uploadFile(file);
+          setAttachments(prev => [...prev, { ...att, kind: 'file' }].slice(0, 6));
+        }
       }
     } catch (err) {
-      toast(err.message || 'Image upload failed', 'error');
+      toast(err.message || 'Upload failed', 'error');
     } finally {
       setUploading(false);
     }
@@ -448,7 +459,14 @@ export default function ProjectChat() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '6px 8px' }}>
           {attachments.map((att, idx) => (
             <div key={idx} style={{ position: 'relative' }}>
-              <img src={att.url} alt="" onClick={() => setLightboxSrc(att.url)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+              {isImageAttachment(att) ? (
+                <img src={att.url} alt="" onClick={() => setLightboxSrc(att.url)} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
+              ) : (
+                <div style={{ width: 56, height: 56, borderRadius: 6, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 4, textAlign: 'center' }}>
+                  <FileIcon size={16} />
+                  <span style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{att.name}</span>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
@@ -471,7 +489,6 @@ export default function ProjectChat() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
           multiple
           style={{ display: 'none' }}
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
@@ -479,11 +496,11 @@ export default function ProjectChat() {
         <button
           type="button"
           className={s.sendBtn}
-          title="Attach image"
+          title="Attach file"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading || attachments.length >= 6}
         >
-          <ImagePlus size={14} />
+          <Paperclip size={14} />
         </button>
         <MentionInput
           className={s.mentionWrap}

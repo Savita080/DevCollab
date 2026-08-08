@@ -12,13 +12,17 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { Input, Textarea, Select } from '../../components/ui/Input';
 import { SkeletonCard } from '../../components/ui/Skeleton';
-import { fmtDate, taskAssignees } from '../../lib/utils';
+import { fmtDate, taskAssignees, fmtBytes } from '../../lib/utils';
 import TaskDetail from '../../components/kanban/TaskDetail';
 import MultiAssigneeSelect from '../../components/kanban/MultiAssigneeSelect';
-import { uploadImage, isImage } from '../../lib/upload';
-import { ImagePlus, X as XIcon } from 'lucide-react';
+import { uploadImage, uploadFile, isImage, MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES } from '../../lib/upload';
+import { Paperclip, X as XIcon, File as FileIcon } from 'lucide-react';
 import ProjectMembersModal from '../../components/ProjectMembersModal';
 import { workspaces as wsApi, projects as projectsApi } from '../../lib/api';
+
+// Old records (pre-R2 migration) have no `kind` field but are always images —
+// fall back to the presence of width/height to tell them apart from files.
+const isImageAttachment = (att) => att.kind === 'image' || (!att.kind && (att.width || att.height));
 import s from '../../styles/modules/Kanban.module.css';
 import KanbanFilters, { applyFilters, EMPTY_FILTERS } from '../../components/kanban/KanbanFilters';
 import KanbanCalendar from '../../components/kanban/KanbanCalendar';
@@ -64,16 +68,23 @@ export default function ProjectKanban() {
   const createFileRef = useRef(null);
 
   const handleCreateFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter(isImage);
+    const files = Array.from(fileList || []);
     if (files.length === 0) return;
     setCreatingUpload(true);
     try {
       for (const file of files.slice(0, 10)) {
-        const att = await uploadImage(file);
-        setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height }].slice(0, 10) }));
+        if (isImage(file)) {
+          if (file.size > MAX_FILE_BYTES) { toast(`${file.name}: image is too large (max 10MB)`, 'error'); continue; }
+          const att = await uploadImage(file);
+          setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: file.name, width: att.width, height: att.height, kind: 'image' }].slice(0, 10) }));
+        } else {
+          if (file.size > MAX_ATTACHMENT_BYTES) { toast(`${file.name}: file is too large (max 50MB)`, 'error'); continue; }
+          const att = await uploadFile(file);
+          setForm(f => ({ ...f, attachments: [...(f.attachments || []), { url: att.url, name: att.name, size: att.size, mimeType: att.mimeType, kind: 'file' }].slice(0, 10) }));
+        }
       }
     } catch (err) {
-      toast(err.message || 'Image upload failed', 'error');
+      toast(err.message || 'Upload failed', 'error');
     } finally {
       setCreatingUpload(false);
     }
@@ -330,15 +341,22 @@ export default function ProjectKanban() {
           <Input label="Due date" type="date" value={form.dueDate}
             onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} />
 
-          {/* Image attachments */}
+          {/* Attachments */}
           <div>
             <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginBottom: 6, display: 'block' }}>
-              Images
+              Attachments
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {(form.attachments || []).map((att, idx) => (
                 <div key={idx} style={{ position: 'relative', lineHeight: 0 }}>
-                  <img src={att.url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  {isImageAttachment(att) ? (
+                    <img src={att.url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  ) : (
+                    <div title={att.size != null ? fmtBytes(att.size) : undefined} style={{ width: 72, height: 72, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 4, textAlign: 'center' }}>
+                      <FileIcon size={18} />
+                      <span style={{ fontSize: 9, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{att.name}</span>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => setForm(f => ({ ...f, attachments: f.attachments.filter((_, i) => i !== idx) }))}
@@ -352,7 +370,6 @@ export default function ProjectKanban() {
               <input
                 ref={createFileRef}
                 type="file"
-                accept="image/*"
                 multiple
                 style={{ display: 'none' }}
                 onChange={(e) => { handleCreateFiles(e.target.files); e.target.value = ''; }}
@@ -361,10 +378,10 @@ export default function ProjectKanban() {
                 type="button"
                 onClick={() => createFileRef.current?.click()}
                 disabled={creatingUpload || (form.attachments?.length || 0) >= 10}
-                title="Add image"
+                title="Add attachment"
                 style={{ width: 72, height: 72, borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 10 }}
               >
-                <ImagePlus size={16} />
+                <Paperclip size={16} />
                 {creatingUpload ? '…' : 'Add'}
               </button>
             </div>

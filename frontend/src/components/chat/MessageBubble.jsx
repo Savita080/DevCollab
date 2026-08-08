@@ -1,12 +1,16 @@
 import React from 'react';
-import { Pencil, Trash2, Check, X, Pin, PinOff } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Pin, PinOff, File as FileIcon } from 'lucide-react';
 import { Avatar } from '../ui/Badge';
 import MessageBody from '../ui/MessageBody';
 import ReactionBar from '../ui/ReactionBar';
 import { ReplyButton, QuoteChip } from '../ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
-import { fmtRelative } from '../../lib/utils';
+import { fmtRelative, fmtBytes } from '../../lib/utils';
 import s from '../../styles/modules/Chat.module.css';
+
+// Old records (pre-R2 migration) have no `kind` field but are always images —
+// fall back to the presence of width/height to tell them apart from files.
+const isImageAttachment = (att) => att.kind === 'image' || (!att.kind && (att.width || att.height));
 
 export default function MessageBubble({
   m,
@@ -77,18 +81,35 @@ export default function MessageBubble({
         ) : (
           m.content && <span className={s.msgText}><MessageBody text={m.content} /></span>
         )}
-        {/* Image attachments */}
+        {/* Attachments (images + files) */}
         {!m.deletedAt && editingId !== m._id && m.attachments?.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: m.content ? 6 : 0 }}>
             {m.attachments.map((att, idx) => (
-              <img
-                key={idx}
-                src={att.url}
-                alt="attachment"
-                loading="lazy"
-                onClick={() => onImageClick?.(att.url)}
-                style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'zoom-in' }}
-              />
+              isImageAttachment(att) ? (
+                <img
+                  key={idx}
+                  src={att.url}
+                  alt="attachment"
+                  loading="lazy"
+                  onClick={() => onImageClick?.(att.url)}
+                  style={{ maxWidth: 220, maxHeight: 220, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'zoom-in' }}
+                />
+              ) : (
+                <a
+                  key={idx}
+                  href={att.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={att.name}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'rgba(0,0,0,0.06)', textDecoration: 'none', color: 'inherit', maxWidth: 220 }}
+                >
+                  <FileIcon size={14} style={{ flexShrink: 0 }} />
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
+                    {att.name || 'file'}
+                    {att.size != null && <span style={{ color: 'var(--text-3)' }}> · {fmtBytes(att.size)}</span>}
+                  </span>
+                </a>
+              )
             ))}
           </div>
         )}
