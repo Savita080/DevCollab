@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, LayoutGrid, KanbanSquare, MessageSquare, FileText, Code2,
   Palette, Sparkles, Activity, Users, Settings, Folder, Plus, ChevronDown, Check, LogOut,
+  Paperclip,
 } from 'lucide-react';
 import { useWorkspace } from '../../store/workspace';
 import { useAuth } from '../../store/auth';
@@ -62,6 +63,7 @@ export default function ProjectSidebar({ project, canEdit, role }) {
     { to: `${projBase}/chat`,        label: 'Chat',        icon: MessageSquare },
     { to: `${projBase}/wiki`,        label: 'Wiki',        icon: FileText },
     { to: `${projBase}/snippets`,    label: 'Snippets',    icon: Code2 },
+    { to: `${projBase}/artifacts`,   label: 'Artifacts',   icon: Paperclip },
     { to: `${projBase}/whiteboards`, label: 'Whiteboards', icon: Palette },
     { to: `${projBase}/ai`,          label: 'AI Assistant', icon: Sparkles, badge: 'AI' },
     { to: `${projBase}/activity`,    label: 'Activity',    icon: Activity },

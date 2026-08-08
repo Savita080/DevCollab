@@ -1,0 +1,21 @@
+/* pages/project/ProjectArtifacts.module.css */
+.page { display: flex; flex-direction: column; gap: 24px; }
+.header { display: flex; align-items: center; justify-content: space-between; }
+.title { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--text-1); }
+
+.toolbar { display: flex; flex-direction: column; gap: 12px; }
+.searchInput { max-width: 360px; }
+
+.tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag {
+  background: none; border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 12px; color: var(--text-2);
+  cursor: pointer; font-family: var(--font-body);
+  transition: all 0.2s;
+}
+.tag:hover { border-color: var(--indigo); color: var(--text-1); }
+.activeTag { background: var(--accent-soft); border-color: var(--indigo); color: var(--text-1); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.empty { color: var(--text-3); font-size: 14px; padding: 40px 0; }

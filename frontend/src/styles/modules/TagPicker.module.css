@@ -1,0 +1,41 @@
+/* components/artifacts/TagPicker.module.css */
+.wrap { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.chip, .chipSelected {
+  font-size: 11px; font-family: var(--font-mono);
+  border: 1px solid var(--border);
+  padding: 3px 10px; border-radius: 12px;
+  cursor: pointer; background: none;
+  transition: all 0.15s;
+}
+.chip { color: var(--text-2); }
+.chip:hover { border-color: var(--indigo); color: var(--text-1); }
+
+.chipSelected {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--indigo); background: var(--accent-soft);
+  border-color: var(--indigo);
+}
+.chipSelected:hover { opacity: 0.8; }
+
+.addBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border: 1px dashed var(--border);
+  border-radius: 50%;
+  background: none; color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.addBtn:hover { border-color: var(--indigo); color: var(--indigo); }
+
+.newTagInput {
+  font-size: 11px; font-family: var(--font-mono);
+  border: 1px solid var(--indigo);
+  border-radius: 12px;
+  padding: 3px 10px;
+  background: var(--bg-card, #fff);
+  color: var(--text-1);
+  width: 100px;
+}

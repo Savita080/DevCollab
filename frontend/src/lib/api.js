@@ -120,6 +120,15 @@ export const snippets = {
   delete: (wid, pid, id)    => api.delete(`/workspaces/${wid}/projects/${pid}/snippets/${id}`),
 };
 
+// ── Artifacts ─────────────────────────────────────────
+// Mounted at: /api/workspaces/:wId/projects/:pId/artifacts
+export const artifacts = {
+  list:   (wid, pid, params) => api.get(`/workspaces/${wid}/projects/${pid}/artifacts`, { params }),
+  create: (wid, pid, d)      => api.post(`/workspaces/${wid}/projects/${pid}/artifacts`, d),
+  delete: (wid, pid, id)     => api.delete(`/workspaces/${wid}/projects/${pid}/artifacts/${id}`),
+  tags:   (wid, pid)         => api.get(`/workspaces/${wid}/projects/${pid}/artifacts/tags`),
+};
+
 // ── Wiki ──────────────────────────────────────────────
 // Mounted at: /api/workspaces/:wId/projects/:pId/wiki
 export const wiki = {

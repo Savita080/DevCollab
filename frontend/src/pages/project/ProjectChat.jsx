@@ -5,7 +5,8 @@ import { Send, Pencil, Trash2, Check, X, Pin, PinOff, Search, Paperclip, File as
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
 import { useScopedPresence } from '../../lib/hooks';
-import { chat as chatApi, projects as projectsApi, tasks as tasksApi } from '../../lib/api';
+import { chat as chatApi, projects as projectsApi, tasks as tasksApi, artifacts as artifactsApi } from '../../lib/api';
+import TagPicker from '../../components/artifacts/TagPicker';
 import { useChat } from '../../store/chat';
 import { Avatar } from '../../components/ui/Badge';
 import MentionInput from '../../components/ui/MentionInput';
@@ -53,6 +54,8 @@ export default function ProjectChat() {
   const [searchQ, setSearchQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [attachments, setAttachments] = useState([]); // [{ url, width, height }]
+  const [pendingTags, setPendingTags] = useState([]); // optional — travels with attachments as Artifact tags
+  const [projectTags, setProjectTags] = useState([]); // existing tags for this project, for the tag picker
   const [uploading, setUploading] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -82,6 +85,10 @@ export default function ProjectChat() {
         .then(({ data }) => setMembers(data.members ?? []))
         .catch(() => setMembers([]));
     }
+
+    artifactsApi.tags(workspaceId, projectId)
+      .then(({ data }) => setProjectTags(data.tags ?? []))
+      .catch(() => setProjectTags([]));
   }, [workspaceId, projectId]);
 
   // Keep members in sync if the layout's list arrives/changes after mount.
@@ -236,6 +243,7 @@ export default function ProjectChat() {
     e.preventDefault();
     const text = input.trim();
     const pendingAtts = attachments;
+    const pendingAttTags = pendingTags;
     // Need text OR at least one image.
     if (!text && pendingAtts.length === 0) return;
     const replyTo = replyingTo;
@@ -243,6 +251,7 @@ export default function ProjectChat() {
     setInput('');
     setReplyingTo(null);
     setAttachments([]);
+    setPendingTags([]);
 
     // Slash command: /task <title> creates a Kanban task and posts a chat
     // record with a link to the new card. Priority hint: trailing !p0/!p1/!p2.
@@ -287,6 +296,7 @@ export default function ProjectChat() {
       const { data } = await chatApi.sendProject(workspaceId, projectId, {
         content: text,
         ...(pendingAtts.length ? { attachments: pendingAtts } : {}),
+        ...(pendingAtts.length && pendingAttTags.length ? { attachmentTags: pendingAttTags } : {}),
         ...(replyToId ? { replyTo: replyToId } : {}),
       });
       const msg = data.chatMessage ?? data;
@@ -298,6 +308,7 @@ export default function ProjectChat() {
       setMessages(prev => prev.filter(m => m._id !== tempId));
       setInput(text);
       setAttachments(pendingAtts);
+      setPendingTags(pendingAttTags);
       if (replyTo) setReplyingTo(replyTo);
       toast('Failed to send', 'error');
     }
@@ -496,6 +507,11 @@ export default function ProjectChat() {
               Uploading…
             </div>
           )}
+        </div>
+      )}
+      {attachments.length > 0 && (
+        <div style={{ padding: '0 8px 6px' }}>
+          <TagPicker availableTags={projectTags} selected={pendingTags} onChange={setPendingTags} />
         </div>
       )}
 

@@ -82,7 +82,7 @@ export async function uploadImage(file, { onProgress } = {}) {
   const { data: sig } = await uploadsApi.signature(file.name, contentType);
   await putToR2(sig.uploadUrl, blob, contentType, sig.contentDisposition, onProgress);
 
-  return { url: sig.publicUrl, width: dims.width, height: dims.height };
+  return { url: sig.publicUrl, key: sig.key, width: dims.width, height: dims.height };
 }
 
 // Upload one non-image file, no resize. Returns { url, name, size, mimeType }.
@@ -93,5 +93,5 @@ export async function uploadFile(file, { onProgress } = {}) {
   const { data: sig } = await uploadsApi.signature(file.name, contentType);
   await putToR2(sig.uploadUrl, file, contentType, sig.contentDisposition, onProgress);
 
-  return { url: sig.publicUrl, name: file.name, size: file.size, mimeType: contentType };
+  return { url: sig.publicUrl, key: sig.key, name: file.name, size: file.size, mimeType: contentType };
 }

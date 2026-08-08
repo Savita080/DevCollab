@@ -36,6 +36,7 @@ import ProjectKanban      from './pages/project/ProjectKanban';
 import ProjectChat        from './pages/project/ProjectChat';
 import ProjectWiki        from './pages/project/ProjectWiki';
 import ProjectSnippets    from './pages/project/ProjectSnippets';
+import ProjectArtifacts   from './pages/project/ProjectArtifacts';
 import ProjectWhiteboards from './pages/project/ProjectWhiteboards';
 import ProjectAI          from './pages/project/ProjectAI';
 import ProjectActivity    from './pages/project/ProjectActivity';
@@ -136,6 +137,7 @@ export default function App() {
             <Route path="chat"        element={<ProjectChat />} />
             <Route path="wiki"        element={<ProjectWiki />} />
             <Route path="snippets"    element={<ProjectSnippets />} />
+            <Route path="artifacts"   element={<ProjectArtifacts />} />
             <Route path="whiteboards" element={<ProjectWhiteboards />} />
             <Route path="ai"          element={<ProjectAI />} />
             <Route path="activity"    element={<ProjectActivity />} />
