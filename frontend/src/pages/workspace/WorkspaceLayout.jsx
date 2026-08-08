@@ -12,6 +12,7 @@ import WorkspaceTopBar from '../../components/common/WorkspaceTopBar';
 import { Skeleton } from '../../components/ui/Skeleton';
 import ToastStack from '../../components/ui/Toast';
 import NotificationPopupStack from '../../components/ui/NotificationPopup';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import s from '../../styles/modules/WorkspaceLayout.module.css';
 
 export default function WorkspaceLayout() {
@@ -113,6 +114,7 @@ export default function WorkspaceLayout() {
       )}
       <ToastStack />
       <NotificationPopupStack />
+      <ConfirmDialog />
     </>
   );
 }

@@ -36,7 +36,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
   const { update, delete: deleteTask } = useTasks();
   const { current: ws, currentProject } = useWorkspace();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     title: currentTask.title,
@@ -151,7 +151,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this task?')) return;
+    if (!(await confirm('Delete this task?'))) return;
     await deleteTask(ws._id, currentProject._id, currentTask._id);
     toast('Task deleted', 'info');
     onClose();

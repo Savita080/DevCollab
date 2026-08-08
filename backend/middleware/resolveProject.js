@@ -13,11 +13,24 @@ export const resolveProject = async (req, res, next) => {
         const param = req.params.projectId;
         if (!param) return next();
 
+        const workspaceId = req.params.workspaceId;
+
         if (mongoose.isValidObjectId(param) && OBJECT_ID_RE.test(param)) {
+            // Even though the id is well-formed, it may belong to a *different*
+            // workspace than the one in the URL (e.g. a stale client request,
+            // or one crafted by hand). Without this check, downstream RBAC
+            // (requireProjectRole) falls back to the project's real workspace
+            // when checking for a super-admin bypass — silently authorizing
+            // against the wrong workspace instead of 404ing.
+            if (workspaceId) {
+                const project = await Project.findOne({ _id: param, workspace: workspaceId }).select('_id');
+                if (!project) {
+                    return res.status(404).json({ message: "Project not found." });
+                }
+            }
             return next();
         }
 
-        const workspaceId = req.params.workspaceId;
         if (!workspaceId) {
             // Project slugs aren't globally unique — if there's no workspace context,
             // we can't resolve. Shouldn't happen with current routing.

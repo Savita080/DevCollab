@@ -32,7 +32,7 @@ const isImageAttachment = (att) => att.kind === 'image' || (!att.kind && (att.wi
 export default function ProjectChat() {
   const { workspaceId, projectId, project, projectMembers } = useOutletContext();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const clearUnread = useChat(s => s.clear);
   // Scoped presence: only people viewing THIS chat (not the whole project).
   // Keyed by canonical _id, not the URL token (which may be a slug).
@@ -55,11 +55,13 @@ export default function ProjectChat() {
   const [attachments, setAttachments] = useState([]); // [{ url, width, height }]
   const [uploading, setUploading] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const typingEmitRef = useRef(null);
   const bottomRef = useRef(null);
   const messageRefs = useRef({}); // msgId → DOM node, for jump-to-original
+  const dragCounterRef = useRef(0); // nested dragenter/dragleave firing correctly
 
   useEffect(() => {
     if (!workspaceId || !projectId) return;
@@ -220,6 +222,16 @@ export default function ProjectChat() {
     }
   };
 
+  const onDragEnter = (e) => { e.preventDefault(); dragCounterRef.current++; setDragActive(true); };
+  const onDragLeave = (e) => { e.preventDefault(); dragCounterRef.current--; if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setDragActive(false); } };
+  const onDragOver = (e) => e.preventDefault();
+  const onDrop = (e) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setDragActive(false);
+    handleFiles(e.dataTransfer.files);
+  };
+
   const send = async (e) => {
     e.preventDefault();
     const text = input.trim();
@@ -369,7 +381,7 @@ export default function ProjectChat() {
     }
   };
   const handleDelete = async (msgId) => {
-    if (!confirm('Delete this message?')) return;
+    if (!(await confirm('Delete this message?'))) return;
     const original = messages.find(m => m._id === msgId);
     setMessages(prev => prev.map(m => m._id === msgId ? { ...m, deletedAt: new Date().toISOString(), content: '' } : m));
     try { await chatApi.deleteProject(workspaceId, projectId, msgId); }
@@ -380,9 +392,11 @@ export default function ProjectChat() {
   };
 
   return (
-    <div className={s.page}>
+    <div className={s.page} onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={onDragOver} onDrop={onDrop}>
+      {dragActive && <div className={s.dropOverlay}>Drop to attach</div>}
       <ChatHeader
-        project={project}
+        title={`${project?.name || 'Project'} Chat`}
+        subtitle={online.length > 0 ? `${online.length} online` : 'Project conversation'}
         online={online}
         messages={messages}
         searchQ={searchQ}
@@ -434,7 +448,7 @@ export default function ProjectChat() {
           });
           if (seers.length === 0) return null;
           return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, padding: '0 8px 4px', fontSize: 10, color: 'var(--text-3)' }}>
+            <div className={s.seenRow}>
               <span>Seen</span>
               {seers.slice(0, 4).map(r => (
                 <Avatar key={r.user?._id || r.user} name={r.user?.name} src={r.user?.avatar} size={14} />

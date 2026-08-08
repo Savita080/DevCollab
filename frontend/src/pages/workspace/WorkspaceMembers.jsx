@@ -19,7 +19,7 @@ export default function WorkspaceMembers() {
   const { canEdit } = useOutletContext() || {};
   const { current: ws, setWorkspaces, workspaces } = useWorkspace();
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const navigate = useNavigate();
 
   const [members, setMembers] = useState([]);
@@ -94,7 +94,7 @@ export default function WorkspaceMembers() {
   };
 
   const handleRemove = async (userId, name) => {
-    if (!confirm(`Remove ${name} from this workspace?`)) return;
+    if (!(await confirm(`Remove ${name} from this workspace?`))) return;
     try {
       await wsApi.removeMember(ws._id, userId);
       setMembers(m => m.filter(mem => mem.user?._id !== userId));
@@ -124,7 +124,7 @@ export default function WorkspaceMembers() {
 
   const handleTransferOwnership = async () => {
     if (!transferTarget) return;
-    if (!confirm(`Transfer ownership to ${transferTarget.user?.name}? You will become an ADMIN.`)) return;
+    if (!(await confirm(`Transfer ownership to ${transferTarget.user?.name}? You will become an ADMIN.`))) return;
     setTransferLoading(true);
     try {
       const { data } = await wsApi.transferOwnership(ws._id, { newOwnerId: transferTarget.user?._id });
@@ -242,7 +242,7 @@ export default function WorkspaceMembers() {
               .filter(m => m.role !== 'OWNER')
               .map(m => (
                 <button
-                  key={m.user?._id}
+                  key={m.user?._id || m.user}
                   onClick={() => setTransferTarget(m)}
                   style={{
                     padding: '10px 14px',

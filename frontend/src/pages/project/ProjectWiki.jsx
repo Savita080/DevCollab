@@ -21,7 +21,7 @@ import { PrevNextModal, PrevNextBar } from '../../components/wiki/PrevNextContro
 export default function ProjectWiki() {
   const { canEdit } = useOutletContext() || {};
   const { current: ws, currentProject } = useWorkspace();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
 
   // Pages & active state
   const [pages, setPages] = useState([]);
@@ -141,7 +141,7 @@ export default function ProjectWiki() {
   };
 
   const deletePage = async (pg) => {
-    if (!confirm(`Delete page "${pg.title}"?`)) return;
+    if (!(await confirm(`Delete page "${pg.title}"?`))) return;
     try {
       await wikiApi.delete(ws._id, currentProject._id, pg._id);
       const remaining = pages.filter(p => p._id !== pg._id);
@@ -207,7 +207,7 @@ export default function ProjectWiki() {
   };
 
   const deleteFolder = async (folderId) => {
-    if (!confirm('Delete folder? Pages inside will be moved to root.')) return;
+    if (!(await confirm('Delete folder? Pages inside will be moved to root.'))) return;
     try {
       await wikiApi.deleteFolder(ws._id, currentProject._id, folderId);
       setFolders(f => f.filter(ff => ff._id !== folderId));

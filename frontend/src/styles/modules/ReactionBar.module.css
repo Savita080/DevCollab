@@ -20,8 +20,8 @@
   line-height: 1.4;
 }
 .chip:hover {
-  background: var(--bg-3);
-  border-color: var(--border-2);
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 .chip:active { transform: scale(0.96); }
 

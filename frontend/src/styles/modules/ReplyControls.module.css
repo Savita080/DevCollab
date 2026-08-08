@@ -40,7 +40,7 @@
   text-align: left;
   background: var(--accent-soft);
   border-left: 3px solid var(--indigo);
-  border-radius: 8px;
+  border-radius: var(--r-md) var(--r-md) var(--r-md) 4px;
   padding: 6px 10px;
   margin-bottom: 4px;
   max-width: 100%;

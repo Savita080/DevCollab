@@ -31,7 +31,7 @@ export default function ProjectKanban() {
   const { canEdit, isContributor, workspaceRole } = useOutletContext() || {};
   const { current: ws, currentProject } = useWorkspace();
   const { tasks, fetch, create, move, update, loading, bindSocket, unbindSocket, setMoveRejectHandler, delete: deleteTaskStore } = useTasks();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const { user } = useAuth();
   const online = usePresence(currentProject?._id);
 
@@ -50,7 +50,7 @@ export default function ProjectKanban() {
   (filters.deadline ? 1 : 0);
 
   const handleDeleteTask = async (task) => {
-    if (!confirm('Delete this task?')) return;
+    if (!(await confirm('Delete this task?'))) return;
     try {
       await deleteTaskStore(ws._id, currentProject._id, task._id);
       toast('Task deleted', 'info');

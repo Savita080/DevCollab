@@ -20,7 +20,7 @@ import AiReviewResult from '../../components/ai/AiReviewResult';
 export default function ProjectSnippets() {
   const { canEdit } = useOutletContext() || {};
   const { current: ws, currentProject } = useWorkspace();
-  const { toast } = useUI();
+  const { toast, confirm } = useUI();
   const [snippets, setSnippets] = useState([]);
   const [search, setSearch] = useState('');
   const [filterTag, setFilterTag] = useState('');
@@ -80,7 +80,7 @@ export default function ProjectSnippets() {
   };
 
   const handleDelete = async (sn) => {
-    if (!confirm('Delete this snippet?')) return;
+    if (!(await confirm('Delete this snippet?'))) return;
     await snippetsApi.delete(ws._id, currentProject._id, sn._id);
     setSnippets(s => s.filter(x => x._id !== sn._id));
     toast('Snippet deleted', 'info');

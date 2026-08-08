@@ -31,6 +31,17 @@ export const useUI = create((set, get) => ({
   unreadCount: 0,
   sidebarOpen: true,
   paywallModal: null,   // { message, upgradeUrl } or null
+  confirmDialog: null,  // { message, resolve, danger, confirmLabel, cancelLabel } or null
+
+  // Themed replacement for window.confirm — returns a Promise<boolean>.
+  // Usage: if (!(await confirm('Delete this task?'))) return;
+  confirm: (message, opts = {}) => new Promise((resolve) => {
+    set({ confirmDialog: { message, resolve, danger: true, ...opts } });
+  }),
+  resolveConfirm: (result) => {
+    get().confirmDialog?.resolve(result);
+    set({ confirmDialog: null });
+  },
 
   toast: (msg, type = 'info', duration = 4000) => {
     const id = Date.now();
