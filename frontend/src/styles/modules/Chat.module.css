@@ -195,6 +195,8 @@
   text-decoration: none;
   color: inherit;
   max-width: 220px;
+  cursor: pointer;
+  font-family: inherit;
 }
 .msgText {
   font-size: 13.5px;

@@ -5,6 +5,7 @@ import { Avatar } from '../ui/Badge';
 import MessageBody from '../ui/MessageBody';
 import EmojiPickerButton from '../ui/EmojiPickerButton';
 import { ReplyButton, QuoteChip } from '../ui/ReplyControls';
+import FileViewerModal from '../ui/FileViewerModal';
 import rs from '../../styles/modules/ReplyControls.module.css';
 import { fmtChatTime, fmtBytes } from '../../lib/utils';
 import s from '../../styles/modules/Chat.module.css';
@@ -65,6 +66,7 @@ export default function MessageBubble({
   })();
 
   const [menuPos, setMenuPos] = useState(null); // { x, y } or null
+  const [viewingFile, setViewingFile] = useState(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -178,6 +180,7 @@ export default function MessageBubble({
   );
 
   return (
+    <>
     <div
       ref={el => { if (m._id && messageRefs) messageRefs.current[m._id] = el; }}
       className={`${s.msgGroup} ${mine ? s.mine : ''} ${isRunEnd ? s.runEnd : ''} ${reactionEntries.length > 0 ? s.hasReactions : ''}`}
@@ -243,12 +246,10 @@ export default function MessageBubble({
                   className={s.attachmentImg}
                 />
               ) : (
-                <a
+                <button
                   key={idx}
-                  href={att.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  download={att.name}
+                  type="button"
+                  onClick={() => setViewingFile(att)}
                   className={s.attachmentFile}
                 >
                   <FileIcon size={14} style={{ flexShrink: 0 }} />
@@ -256,7 +257,7 @@ export default function MessageBubble({
                     {att.name || 'file'}
                     {att.size != null && <span style={{ color: 'var(--text-3)' }}> · {fmtBytes(att.size)}</span>}
                   </span>
-                </a>
+                </button>
               )
             ))}
           </div>
@@ -329,5 +330,7 @@ export default function MessageBubble({
       </div>
       {contextMenu}
     </div>
+    <FileViewerModal open={!!viewingFile} onClose={() => setViewingFile(null)} file={viewingFile} />
+    </>
   );
 }

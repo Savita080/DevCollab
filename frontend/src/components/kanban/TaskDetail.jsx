@@ -19,6 +19,7 @@ import { fmtDate, fmtRelative, fmtBytes, taskAssigneeIds, taskAssignees } from '
 import MultiAssigneeSelect from './MultiAssigneeSelect';
 import { uploadImage, uploadFile, isImage, MAX_FILE_BYTES, MAX_ATTACHMENT_BYTES } from '../../lib/upload';
 import ImageLightbox from '../ui/ImageLightbox';
+import FileViewerModal from '../ui/FileViewerModal';
 import { ImagePlus, X as XIcon, File as FileIcon } from 'lucide-react';
 import s from '../../styles/modules/TaskDetail.module.css';
 
@@ -54,6 +55,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
   const [replyingTo, setReplyingTo] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [viewingFile, setViewingFile] = useState(null);
   const fileInputRef = useRef(null);
   const commentsEndRef = useRef(null);
   const commentRefs = useRef({});
@@ -302,18 +304,16 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
                     {isImageAttachment(att) ? (
                       <img src={att.url} alt={att.name || 'attachment'} onClick={() => setLightboxSrc(att.url)} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'zoom-in' }} />
                     ) : (
-                      <a
-                        href={att.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={att.name}
+                      <button
+                        type="button"
+                        onClick={() => setViewingFile(att)}
                         title={att.size != null ? fmtBytes(att.size) : undefined}
-                        style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', textDecoration: 'none', color: 'inherit' }}
+                        style={{ width: 96, height: 96, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6, textAlign: 'center', background: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}
                       >
                         <FileIcon size={20} />
                         <span style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{att.name || 'file'}</span>
                         {att.size != null && <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{fmtBytes(att.size)}</span>}
-                      </a>
+                      </button>
                     )}
                     {editing && canEdit && (
                       <button
@@ -471,6 +471,7 @@ export default function TaskDetail({ task, onClose, wsMembers = [], mentionMembe
         })()}
       </div>
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      <FileViewerModal open={!!viewingFile} onClose={() => setViewingFile(null)} file={viewingFile} />
     </Modal>
   );
 }

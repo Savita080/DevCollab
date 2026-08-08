@@ -14,6 +14,9 @@
   height: 120px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  border-left: none; border-right: none; border-top: none;
+  width: 100%; padding: 0; cursor: pointer;
+  font-family: inherit;
 }
 .thumb { width: 100%; height: 100%; object-fit: cover; }
 .fileIcon { font-size: 36px; }

@@ -1,0 +1,132 @@
+/* components/ui/FileViewerModal.module.css — full-screen document viewer */
+.overlay {
+  position: fixed; inset: 0;
+  z-index: 2000;
+  background: var(--bg-1, #1b1b1f);
+  display: flex; flex-direction: column;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.headerLeft { display: flex; align-items: center; gap: 10px; color: var(--text-1); min-width: 0; }
+.headerName { font-size: 14px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+.headerMeta { font-size: 11px; color: var(--text-3); }
+
+.headerCenter { display: flex; align-items: center; gap: 4px; }
+.headerRight { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.iconBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--text-2); cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.iconBtn:hover:not(:disabled) { color: var(--text-1); background: var(--bg-hover); }
+.iconBtn:disabled { opacity: 0.35; cursor: default; }
+
+.pageIndicator, .zoomIndicator { font-size: 12px; color: var(--text-2); min-width: 52px; text-align: center; }
+.divider { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+
+.stage {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  padding: 24px;
+}
+
+/* Continuous scroll through every page, like a real PDF viewer — not one
+   page swapped per click. This element is the IntersectionObserver root
+   that drives the page-number indicator as you scroll.
+   Note: react-pdf's <Document> wraps children in its own plain <div>, one
+   level below .pdfScroll — so the gap has to live on that wrapper, not here. */
+.pdfScroll {
+  width: 100%; height: 100%;
+  overflow: auto;
+  display: flex; justify-content: center;
+}
+/* .pdfScroll is a row flex container, so this stack gets stretched to the
+   viewport height — which makes its own column children shrinkable. Without
+   flex-shrink:0 below, 10 pages/slides get squashed to a fraction of their
+   height while the canvas/SVG inside keeps its real size and gets clipped. */
+.pdfScroll > :global(div) {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 24px;
+  padding-bottom: 24px;
+  flex-shrink: 0;
+}
+.pdfPage { flex-shrink: 0; }
+.pdfPage :global(canvas) { box-shadow: var(--shadow-card); border-radius: 4px; display: block; }
+
+/* pptx-viewer renders each slide as an SVG via renderSlideToElement — reuses
+   .pdfScroll's continuous-scroll shell, just swaps in slide cards instead of
+   PDF page canvases. */
+.pptxStack { display: flex; flex-direction: column; align-items: center; gap: 24px; padding-bottom: 24px; flex-shrink: 0; }
+/* Two layers per slide: the outer one reserves real layout space (so zooming
+   grows the scroll area instead of overlapping the next slide), the inner one
+   holds the fixed-size SVG and carries the CSS zoom transform. */
+.pptxSlideBox { flex-shrink: 0; }
+.pptxSlide { background: #fff; box-shadow: var(--shadow-card); border-radius: 4px; overflow: hidden; }
+.pptxSlide :global(svg) { display: block; }
+
+.textFrame {
+  width: 100%; height: 100%;
+  max-width: 900px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: #fff;
+}
+
+.docxScroll {
+  width: 100%; height: 100%;
+  max-width: 900px;
+  overflow: auto;
+  background: transparent;
+  padding: 24px;
+}
+/* docx-preview renders each page as a sibling <section class="docx"> inside
+   .docx-wrapper — give each its own card + a visible gap so page breaks
+   are actually visible instead of running text together. */
+.docxContainer :global(.docx-wrapper) { background: transparent; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.docxContainer :global(.docx-wrapper > section) { background: #fff; box-shadow: var(--shadow-card); border-radius: 4px; margin: 0 !important; }
+
+/* Spreadsheets are naturally wide — unlike the docx viewer, don't cap width
+   to a document-page size or every sheet forces horizontal scrolling. */
+.xlsxScroll {
+  width: 100%; height: 100%;
+  overflow: auto;
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: 24px;
+  box-sizing: border-box;
+}
+.xlsxZoomLayer { display: inline-block; }
+.xlsxZoomLayer :global(table) { border-collapse: collapse; font-size: 13px; color: #1a1a1a; }
+.xlsxZoomLayer :global(td), .xlsxZoomLayer :global(th) { border: 1px solid #ddd; padding: 4px 8px; white-space: nowrap; }
+
+.sheetTabs { display: flex; gap: 2px; margin-left: 12px; }
+.sheetTab {
+  background: none; border: none; border-radius: var(--r-sm) var(--r-sm) 0 0;
+  color: var(--text-3); font-size: 12px; padding: 6px 12px;
+  cursor: pointer;
+}
+.sheetTab:hover { color: var(--text-1); }
+.sheetTabActive { color: var(--text-1); background: var(--bg-hover); font-weight: 600; }
+
+.status { color: var(--text-3); font-size: 13px; margin: 0; }
+
+.noPreview {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; color: var(--text-2);
+}
+.noPreviewText { font-size: 15px; margin: 0; color: var(--text-1); }
+.meta { color: var(--text-3); font-size: 12px; margin: 0; }

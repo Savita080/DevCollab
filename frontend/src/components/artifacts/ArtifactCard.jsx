@@ -1,4 +1,6 @@
 // components/artifacts/ArtifactCard.jsx
+import { useState } from 'react';
+import FileViewerModal from '../ui/FileViewerModal';
 import s from '../../styles/modules/ArtifactCard.module.css';
 
 const SOURCE_LABEL = { chat: 'Chat', task: 'Task', direct: 'Upload' };
@@ -12,14 +14,19 @@ function formatSize(bytes) {
 
 export default function ArtifactCard({ artifact, canDelete, onDelete }) {
   const isImage = artifact.kind === 'image';
+  const [viewing, setViewing] = useState(false);
 
   return (
     <div className={s.card}>
-      <a className={s.preview} href={artifact.url} target="_blank" rel="noreferrer" title={artifact.name}>
-        {isImage
-          ? <img src={artifact.url} alt={artifact.name} className={s.thumb} />
-          : <span className={s.fileIcon}>📄</span>}
-      </a>
+      {isImage ? (
+        <a className={s.preview} href={artifact.url} target="_blank" rel="noreferrer" title={artifact.name}>
+          <img src={artifact.url} alt={artifact.name} className={s.thumb} />
+        </a>
+      ) : (
+        <button type="button" className={s.preview} onClick={() => setViewing(true)} title={artifact.name}>
+          <span className={s.fileIcon}>📄</span>
+        </button>
+      )}
       <div className={s.body}>
         <div className={s.nameRow}>
           <span className={s.name} title={artifact.name}>{artifact.name || 'Untitled file'}</span>
@@ -38,6 +45,9 @@ export default function ArtifactCard({ artifact, canDelete, onDelete }) {
           </div>
         )}
       </div>
+      {!isImage && (
+        <FileViewerModal open={viewing} onClose={() => setViewing(false)} file={artifact} />
+      )}
     </div>
   );
 }

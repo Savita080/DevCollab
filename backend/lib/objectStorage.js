@@ -7,7 +7,7 @@
 //
 // Env-guarded like redis/webpush — if keys are missing, uploads are disabled
 // and the rest of the app keeps working.
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'crypto';
 
@@ -65,6 +65,33 @@ export async function signUpload({ filename = 'file', contentType = 'application
         contentDisposition: disposition,
         publicUrl: `${process.env.R2_PUBLIC_URL}/${key}`,
     };
+}
+
+// The key an object was stored under is fully determined by its public URL
+// (`${R2_PUBLIC_URL}/${key}`) — recover it without needing a separate DB
+// column on every attachment.
+export function keyFromPublicUrl(url) {
+    const base = `${process.env.R2_PUBLIC_URL}/`;
+    if (!url || !url.startsWith(base)) return null;
+    return url.slice(base.length);
+}
+
+// A one-time GET URL, valid for 5 minutes, that overrides the object's
+// stored Content-Disposition — lets the SAME uploaded object be opened
+// inline (view) or forced to download (download) on demand, without
+// re-uploading or duplicating the file.
+export async function signGet({ key, filename = 'file', disposition = 'inline' } = {}) {
+    const safeName = (filename || 'file').replace(/["\r\n]/g, '').slice(0, 200);
+    const responseDisposition = disposition === 'download'
+        ? `attachment; filename="${safeName}"`
+        : 'inline';
+
+    const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: key,
+        ResponseContentDisposition: responseDisposition,
+    });
+    return getSignedUrl(s3, command, { expiresIn: 300 });
 }
 
 export default s3;
