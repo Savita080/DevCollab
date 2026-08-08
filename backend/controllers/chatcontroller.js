@@ -5,6 +5,7 @@ import Workspace from '../models/workspace.js';
 import { notifyMentions, notifyUser } from '../utils/notify.js';
 import { toggleReaction } from '../utils/reactions.js';
 import { extractFirstUrl, fetchLinkPreview } from '../utils/linkPreview.js';
+import { createArtifactsFromAttachments } from './artifactcontroller.js';
 
 // Populate shape used everywhere — sender + the quoted parent (sender + content).
 // Reply previews need just enough to render the quote chip, not the full thread.
@@ -58,6 +59,20 @@ export const sendMessage = async (req, res) => {
 
         // Make it LIVE! Broadcast to everyone in the project room
         req.io.to(projectId).emit('new_group_message', populatedMessage);
+
+        // Every chat attachment also becomes an Artifact so it shows up in the
+        // project's Artifacts page. One optional tag set applies to the whole
+        // message (the composer only has a single inline tag input).
+        if (attachments.length) {
+            createArtifactsFromAttachments({
+                project: projectId,
+                uploader: req.userId,
+                attachments,
+                tags: req.body.attachmentTags,
+                source: 'chat',
+                sourceMessage: newMessage._id,
+            }).catch(err => console.error('[chat->artifact] failed:', err.message));
+        }
 
         // Build the access-scoped recipient set: project members + workspace OWNER/ADMIN.
         // We don't notify random workspace users on a project-scoped @mention.

@@ -3,6 +3,7 @@ import User from '../models/user.js';
 import { notifyUser } from '../utils/notify.js';
 import { logProjectActivity } from '../utils/activityLogger.js';
 import { PROJ_ACTIONS, OBJECT_TYPES } from '../utils/activityActions.js';
+import { createArtifactsFromAttachments } from './artifactcontroller.js';
 
 // Normalize an incoming assignee payload into a clean array of id strings.
 // Accepts `assignees` (array — preferred) OR legacy `assignee` (single). Dedupes
@@ -87,6 +88,17 @@ export const createTask = async (req, res) => {
 
         req.io.to(projectId).emit('task_created', populated);
 
+        if (attachments.length) {
+            createArtifactsFromAttachments({
+                project: projectId,
+                uploader: req.userId,
+                attachments,
+                tags: req.body.attachmentTags,
+                source: 'task',
+                sourceTask: newTask._id,
+            }).catch(err => console.error('[task->artifact] failed:', err.message));
+        }
+
         await logProjectActivity({
             workspace: req.params.workspaceId,
             project: projectId,
@@ -132,7 +144,7 @@ export const updateTask = async (req, res) => {
 
         // Scope to the project in the URL so a contributor on project A can't
         // edit a task that lives in project B by guessing its id (IDOR).
-        const before = await Task.findOne({ _id: taskId, project: projectId }).select('assignees assignee title');
+        const before = await Task.findOne({ _id: taskId, project: projectId }).select('assignees assignee title attachments');
         if (!before) {
             return res.status(404).json({ message: "Task not found" });
         }
@@ -141,8 +153,13 @@ export const updateTask = async (req, res) => {
         for (const key of TASK_UPDATABLE) {
             if (req.body[key] !== undefined) updates[key] = req.body[key];
         }
+        // Only the attachments newly added in this update should become
+        // Artifacts — diff against what the task already had, not the full list.
+        let newlyAddedAttachments = [];
         if (updates.attachments !== undefined) {
             updates.attachments = sanitizeAttachments(updates.attachments);
+            const beforeUrls = new Set((before.attachments || []).map(a => a.url));
+            newlyAddedAttachments = updates.attachments.filter(a => !beforeUrls.has(a.url));
         }
 
         // Assignees: accept `assignees[]` or legacy `assignee`. Only touch them
@@ -180,6 +197,17 @@ export const updateTask = async (req, res) => {
         }
 
         req.io.to(req.params.projectId).emit('task_updated', updatedTask);
+
+        if (newlyAddedAttachments.length) {
+            createArtifactsFromAttachments({
+                project: req.params.projectId,
+                uploader: req.userId,
+                attachments: newlyAddedAttachments,
+                tags: req.body.attachmentTags,
+                source: 'task',
+                sourceTask: updatedTask._id,
+            }).catch(err => console.error('[task->artifact] failed:', err.message));
+        }
 
         await logProjectActivity({
             workspace: req.params.workspaceId,
