@@ -50,6 +50,28 @@ export function fmtRelative(dateString) {
   return fmtDate(dateString);
 }
 
+// WhatsApp-style message timestamp: clock time for today ("4:41 pm"),
+// "Yesterday" for the previous day, weekday name within the last week,
+// else a short date — never "Nm ago".
+export function fmtChatTime(dateString) {
+  if (!dateString) return "";
+  const d = new Date(dateString);
+  if (isNaN(d)) return "";
+  const now = new Date();
+  const h24 = d.getHours();
+  const h12 = h24 % 12 || 12;
+  const mins = String(d.getMinutes()).padStart(2, "0");
+  const time = `${h12}:${mins} ${h24 < 12 ? "am" : "pm"}`;
+
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+  if (dayDiff === 0) return time;
+  if (dayDiff === 1) return `Yesterday ${time}`;
+  if (dayDiff < 7) return `${d.toLocaleDateString("en-US", { weekday: "short" })} ${time}`;
+  return `${fmtDate(dateString)} ${time}`;
+}
+
 // Human-readable file size (e.g. "1.2 MB")
 export function fmtBytes(bytes) {
   if (bytes == null || isNaN(bytes)) return "";

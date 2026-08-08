@@ -6,7 +6,7 @@ import MessageBody from '../ui/MessageBody';
 import EmojiPickerButton from '../ui/EmojiPickerButton';
 import { ReplyButton, QuoteChip } from '../ui/ReplyControls';
 import rs from '../../styles/modules/ReplyControls.module.css';
-import { fmtRelative, fmtBytes } from '../../lib/utils';
+import { fmtChatTime, fmtBytes } from '../../lib/utils';
 import s from '../../styles/modules/Chat.module.css';
 
 const QUICK_REACTS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -219,7 +219,15 @@ export default function MessageBubble({
             </div>
           </div>
         ) : (
-          m.content && <span className={s.msgText}><MessageBody text={m.content} /></span>
+          m.content && (
+            <p className={s.msgText}>
+              <MessageBody text={m.content} />
+              <span className={s.msgTimeInline}>
+                {fmtChatTime(m.createdAt)}
+                {m.editedAt && <span className={s.editedTag}> · edited</span>}
+              </span>
+            </p>
+          )
         )}
         {/* Attachments (images + files) */}
         {!m.deletedAt && editingId !== m._id && m.attachments?.length > 0 && (
@@ -299,10 +307,12 @@ export default function MessageBubble({
             </div>
           </a>
         )}
-        <span className={s.msgTime}>
-          {fmtRelative(m.createdAt)}
-          {m.editedAt && !m.deletedAt && <span style={{ marginLeft: 4, opacity: 0.7 }}>(edited)</span>}
-        </span>
+        {(m.deletedAt || !m.content || editingId === m._id) && (
+          <span className={s.msgTime}>
+            {fmtChatTime(m.createdAt)}
+            {m.editedAt && !m.deletedAt && <span style={{ marginLeft: 4, opacity: 0.7 }}>(edited)</span>}
+          </span>
+        )}
         {reactionEntries.length > 0 && (
           <button
             type="button"
