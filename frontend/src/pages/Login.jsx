@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Loader2, ArrowRight, Zap } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../store/auth";
@@ -12,6 +12,9 @@ import ThemeQuickPick from "../components/layout/ThemeQuickPick";
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/dashboard";
 
   const [fields, setFields] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
@@ -38,7 +41,7 @@ export default function Login() {
     try {
       await login({ email: fields.email, password: fields.password });
       toast.success("Welcome back!");
-      navigate("/dashboard");
+      navigate(redirectTo);
     } catch (err) {
       const msg =
         err?.response?.data?.message || "Invalid credentials. Please try again.";
@@ -180,12 +183,12 @@ export default function Login() {
             </div>
 
             {/* Google OAuth Button */}
-            <GoogleAuthButton label="Continue with Google" />
+            <GoogleAuthButton label="Continue with Google" redirectTo={redirectTo} />
 
             <p className="mt-6 text-center text-xs" style={{ color: 'var(--text-3)' }}>
               Don't have an account?{" "}
               <Link
-                to="/register"
+                to={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : "/register"}
                 className="transition-colors font-medium"
                 style={{ color: 'var(--cyan)' }}
               >

@@ -17,7 +17,7 @@ const GoogleIcon = () => (
   </svg>
 );
 
-export default function GoogleAuthButton({ label = "Continue with Google", className = "" }) {
+export default function GoogleAuthButton({ label = "Continue with Google", className = "", redirectTo = "/dashboard" }) {
   const [loading, setLoading] = useState(false);
   const { googleLogin } = useAuth();
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export default function GoogleAuthButton({ label = "Continue with Google", class
       }
       try {
         await googleLogin({ credential: tokenResponse.access_token });
-        navigate('/dashboard');
+        navigate(redirectTo);
       } catch (err) {
         console.error('Backend Google auth failed:', err.message);
         toast.error('Google login failed: ' + err.message);

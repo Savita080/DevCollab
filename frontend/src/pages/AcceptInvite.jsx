@@ -56,7 +56,10 @@ export default function AcceptInvite() {
             <Link to="/dashboard" className={s.btn}>Go to Dashboard →</Link>
           )}
           {status === 'unauthenticated' && (
-            <Link to={`/login?redirect=/invite/accept/${token}`} className={s.btn}>Sign In</Link>
+            <>
+              <Link to={`/login?redirect=/invite/accept/${token}`} className={s.btn}>Sign In</Link>
+              <Link to={`/register?redirect=/invite/accept/${token}`} className={s.btn}>Create Account</Link>
+            </>
           )}
           {status === 'error' && (
             <Link to="/dashboard" className={s.btn}>Back to Dashboard</Link>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Loader2, ArrowRight, User, Mail, Lock } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../store/auth";
@@ -175,6 +175,9 @@ function PasswordStrength({ password }) {
 export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/dashboard";
 
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");
@@ -204,7 +207,7 @@ export default function Register() {
     try {
       await register({ name, email, password });
       toast.success("Account created! Welcome");
-      navigate("/dashboard");
+      navigate(redirectTo);
     } catch (err) {
       const msg = err?.response?.data?.message || "Something went wrong.";
       toast.error(msg);
@@ -377,12 +380,12 @@ export default function Register() {
             <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           </div>
 
-          <GoogleAuthButton label="Sign up with Google" />
+          <GoogleAuthButton label="Sign up with Google" redirectTo={redirectTo} />
 
           <p className="mt-6 text-center text-xs" style={{ color: 'var(--text-3)' }}>
             Already have an account?{" "}
             <Link
-              to="/login"
+              to={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login"}
               className="transition-colors font-medium"
               style={{ color: 'var(--violet)' }}
             >
